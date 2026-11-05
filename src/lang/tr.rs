@@ -825,5 +825,8 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Renew trust", "Güveni yenile"),
         ("install-directory-not-empty-tip", "Seçilen klasör boş değil. Kurulum mevcut verileri silebilir. Farklı bir klasör seçmeyi düşünün."),
         ("Request approval", "Onay iste"),
+        ("Forget pinned key", ""),
+        ("ultra-pin-forgotten-tip", ""),
+        ("ultra-no-pin-tip", ""),
     ].iter().cloned().collect();
 }

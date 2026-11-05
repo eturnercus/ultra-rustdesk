@@ -292,5 +292,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("api_server_empty_tip", "With API Server empty, your custom server defaults to HTTP. Contact your administrator to enable HTTPS."),
         ("android-logs-folder-tip", "Choose Android → media to store log files."),
         ("install-directory-not-empty-tip", "The selected folder is not empty. Installation may delete existing data. Consider choosing a different folder."),
+        ("ultra-pin-forgotten-tip", "The key is forgotten. The next connection pins a new one."),
+        ("ultra-no-pin-tip", "No key is pinned for this device."),
     ].iter().cloned().collect();
 }

@@ -825,5 +825,8 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Renew trust", "Продлить доверие"),
         ("install-directory-not-empty-tip", "Выбранная папка не пуста. При установке существующие данные могут быть удалены. Рекомендуется выбрать другую папку."),
         ("Request approval", "Запросить одобрение"),
+        ("Forget pinned key", "Забыть закреплённый ключ"),
+        ("ultra-pin-forgotten-tip", "Ключ забыт. При следующем подключении будет закреплён новый ключ."),
+        ("ultra-no-pin-tip", "Для этого устройства нет закреплённого ключа."),
     ].iter().cloned().collect();
 }

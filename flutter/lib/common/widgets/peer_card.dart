@@ -944,6 +944,23 @@ abstract class BasePeerCard extends StatelessWidget {
     );
   }
 
+  /// Ultra RustDesk: lets a reinstalled device (new key) be trusted again.
+  @protected
+  MenuEntryBase<String> _forgetUltraKeyAction(String id) {
+    return MenuEntryButton<String>(
+      childBuilder: (TextStyle? style) => Text(
+        translate('Forget pinned key'),
+        style: style,
+      ),
+      proc: () async {
+        final removed = await bind.mainUltraForgetPin(id: id);
+        showToast(translate(removed ? 'ultra-pin-forgotten-tip' : 'ultra-no-pin-tip'));
+      },
+      padding: menuPadding,
+      dismissOnClicked: true,
+    );
+  }
+
   @protected
   MenuEntryBase<String> _unrememberPasswordAction(String id) {
     return MenuEntryButton<String>(
@@ -1097,6 +1114,7 @@ class RecentPeerCard extends BasePeerCard {
       menuItems.add(_addToAb(peer));
     }
 
+    if (!isWeb) menuItems.add(_forgetUltraKeyAction(peer.id));
     menuItems.add(MenuEntryDivider());
     menuItems.add(_removeAction(peer.id));
     return menuItems;
@@ -1137,6 +1155,7 @@ class FavoritePeerCard extends BasePeerCard {
       menuItems.add(_addToAb(peer));
     }
 
+    if (!isWeb) menuItems.add(_forgetUltraKeyAction(peer.id));
     menuItems.add(MenuEntryDivider());
     menuItems.add(_removeAction(peer.id));
     return menuItems;
@@ -1177,6 +1196,7 @@ class DiscoveredPeerCard extends BasePeerCard {
       menuItems.add(_addToAb(peer));
     }
 
+    if (!isWeb) menuItems.add(_forgetUltraKeyAction(peer.id));
     menuItems.add(MenuEntryDivider());
     menuItems.add(_removeAction(peer.id));
     return menuItems;

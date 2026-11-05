@@ -66,7 +66,7 @@ pub fn check_and_pin(peer: &str, pk: &[u8]) -> ResultType<PinResult> {
         Some(pinned) if *pinned == hex => Ok(PinResult::Match),
         Some(pinned) => bail!(
             "SECURITY: the key of {} has changed (pinned {}, got {}). Possible man-in-the-middle; \
-             the connection was refused. If the remote device was reinstalled, remove its pin and retry.",
+             the connection was refused. If the remote device was reinstalled, choose \"Forget pinned key\" in its menu and retry.",
             key,
             crate::common::pk_to_fingerprint(hex_to_bytes(pinned)),
             crate::common::pk_to_fingerprint(pk.to_vec())
@@ -85,7 +85,6 @@ pub fn check_and_pin(peer: &str, pk: &[u8]) -> ResultType<PinResult> {
 }
 
 /// Forgets the key pinned for `peer`, so the next connection pins afresh.
-#[allow(dead_code)] // wired to the UI in a later step
 pub fn remove_pin(peer: &str) -> ResultType<bool> {
     let _guard = PINS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut pins = load_pins();
@@ -94,6 +93,19 @@ pub fn remove_pin(peer: &str) -> ResultType<bool> {
         store_pins(&pins)?;
     }
     Ok(removed)
+}
+
+/// Forgets every key pinned for what the user knows as `peer`: the address itself, and the ID
+/// a LAN connection pinned it under.
+pub fn forget(peer: &str) -> bool {
+    let mut removed = false;
+    for name in [peer.to_owned(), format!("id:{}", peer)] {
+        match remove_pin(&name) {
+            Ok(r) => removed |= r,
+            Err(e) => log::warn!("Failed to forget the key of {}: {}", name, e),
+        }
+    }
+    removed
 }
 
 fn hex_of(b: &[u8]) -> String {

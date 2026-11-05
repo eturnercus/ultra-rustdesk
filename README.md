@@ -1,182 +1,131 @@
 <p align="center">
-  <img src="res/logo-header.svg" alt="RustDesk - Your remote desktop"><br>
-  <a href="#raw-steps-to-build">Build</a> •
-  <a href="#how-to-build-with-docker">Docker</a> •
-  <a href="#file-structure">Structure</a> •
-  <a href="#screenshots">Screenshots</a><br>
-  [<a href="docs/README-UA.md">Українська</a>] | [<a href="docs/README-CS.md">česky</a>] | [<a href="docs/README-ZH.md">中文</a>] | [<a href="docs/README-HU.md">Magyar</a>] | [<a href="docs/README-ES.md">Español</a>] | [<a href="docs/README-FA.md">فارسی</a>] | [<a href="docs/README-FR.md">Français</a>] | [<a href="docs/README-DE.md">Deutsch</a>] | [<a href="docs/README-PL.md">Polski</a>] | [<a href="docs/README-ID.md">Indonesian</a>] | [<a href="docs/README-FI.md">Suomi</a>] | [<a href="docs/README-ML.md">മലയാളം</a>] | [<a href="docs/README-JP.md">日本語</a>] | [<a href="docs/README-NL.md">Nederlands</a>] | [<a href="docs/README-IT.md">Italiano</a>] | [<a href="docs/README-RU.md">Русский</a>] | [<a href="docs/README-PTPT.md">Português (Portugal)</a>] | [<a href="docs/README-PTBR.md">Português (Brasil)</a>] | [<a href="docs/README-EO.md">Esperanto</a>] | [<a href="docs/README-KR.md">한국어</a>] | [<a href="docs/README-AR.md">العربي</a>] | [<a href="docs/README-VN.md">Tiếng Việt</a>] | [<a href="docs/README-DA.md">Dansk</a>] | [<a href="docs/README-GR.md">Ελληνικά</a>] | [<a href="docs/README-TR.md">Türkçe</a>] | [<a href="docs/README-NO.md">Norsk</a>] | [<a href="docs/README-RO.md">Română</a>]<br>
-  <b>We need your help to translate this README, <a href="https://github.com/rustdesk/rustdesk/tree/master/src/lang">RustDesk UI</a> and <a href="https://github.com/rustdesk/doc.rustdesk.com">RustDesk Doc</a> to your native language</b>
+  <img src="res/logo-header.svg" alt="Ultra RustDesk" width="420"><br>
+  <b>Ultra RustDesk</b> — a remote desktop built for direct, low-latency connections on difficult networks<br>
+  <a href="docs/README-RU.md">Русский</a> | English
 </p>
 
 > [!Caution]
-> **Misuse Disclaimer:** <br>
-> The developers of RustDesk do not condone or support any unethical or illegal use of this software. Misuse, such as unauthorized access, control or invasion of privacy, is strictly against our guidelines. The authors are not responsible for any misuse of the application.
+> **Use it only on devices you own or are allowed to control.** Unauthorized access to other people's
+> computers is illegal. The authors are not responsible for misuse.
 
+Ultra RustDesk is a fork of [RustDesk](https://github.com/rustdesk/rustdesk) maintained by **eturnercus**.
+It keeps RustDesk's video, input, clipboard and file transfer, and replaces how two devices find and talk
+to each other: direct connections come first, they are always end-to-end encrypted, and several
+transports are tried in parallel so a session starts quickly even when some of them are blocked or slow.
 
-Chat with us: [Discord](https://discord.gg/nDceKgxnkV) | [Twitter](https://twitter.com/rustdesk) | [Reddit](https://www.reddit.com/r/rustdesk) | [YouTube](https://www.youtube.com/@rustdesk)
+Platforms: **Windows x64**, **Linux x86_64** (`.deb`, AppImage), **Android** (arm64, armv7, x86_64, universal APK).
 
-[![RustDesk Server Pro](https://img.shields.io/badge/RustDesk%20Server%20Pro-Advanced%20Features-blue)](https://rustdesk.com/pricing.html)
+---
 
-Yet another remote desktop solution, written in Rust. Works out of the box with no configuration required. You have full control of your data, with no concerns about security. You can use our rendezvous/relay server, [set up your own](https://rustdesk.com/server), or [write your own rendezvous/relay server](https://github.com/rustdesk/rustdesk-server-demo).
+## What is different from RustDesk
 
-![image](https://user-images.githubusercontent.com/71636191/171661982-430285f0-2e12-4b1d-9957-4a58e375304d.png)
+| | RustDesk | Ultra RustDesk |
+|---|---|---|
+| Direct IP connection | **not encrypted** (only a server can vouch for keys) | always end-to-end encrypted, key pinned on first use |
+| Transports for a direct connection | TCP | **QUIC and TCP raced in parallel** |
+| Direct access | off by default | on by default |
+| Default / maximum frame rate | 30 / 120 FPS (30 without your own server) | **60 / 144 FPS** |
+| Needs public RustDesk servers | for ID connections | no, for direct connections |
+| Android package | `com.carriez.flutter_hbb` | `com.eturnercus.ultrarustdesk` (installs next to RustDesk) |
 
-RustDesk welcomes contribution from everyone. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for help getting started.
+### End-to-end encryption with pinned keys
 
-[**FAQ**](https://github.com/rustdesk/rustdesk/wiki/FAQ)
+Upstream RustDesk trusts a peer's key only when its rendezvous server signs it, so direct IP sessions ran
+in plaintext and showed an "Insecure Connection" warning. In Ultra RustDesk:
 
-[**BINARY DOWNLOAD**](https://github.com/rustdesk/rustdesk/releases)
+- the controlled device sends its Ed25519 public key together with its signed identity;
+- the controlling device remembers that key for the address on the first connection (trust on first use,
+  like SSH) and **refuses** a later connection that presents a different key;
+- a session never falls back to plaintext;
+- the device's own key fingerprint is always shown in **Settings → About**, so you can compare it once.
 
-[**NIGHTLY BUILD**](https://github.com/rustdesk/rustdesk/releases/tag/nightly)
+Code: [`src/ultra_pin.rs`](src/ultra_pin.rs).
 
-[<img src="https://f-droid.org/badge/get-it-on.png"
-    alt="Get it on F-Droid"
-    height="80">](https://f-droid.org/en/packages/com.carriez.flutter_hbb)
-[<img src="https://flathub.org/api/badge?svg&locale=en"
-    alt="Get it on Flathub"
-    height="80">](https://flathub.org/apps/com.rustdesk.RustDesk)
+### QUIC transport and parallel racing
 
-## Dependencies
+- QUIC over UDP on the **same port** as the direct TCP listener (21118 by default).
+- To the network it looks like ordinary HTTP/3 (ALPN `h3`, TLS 1.3). The QUIC certificate is throwaway;
+  who the peer is gets decided by the pinned-key handshake inside, not by the certificate.
+- Tuned for latency: BBR congestion control, 16/32 MB flow-control windows so a video frame never waits
+  for the receiver, 4 s keep-alive so NAT mappings stay open.
+- The controller starts QUIC immediately and TCP 250 ms later; the first one to finish the encrypted
+  handshake wins. If UDP is blocked, this costs a quarter of a second.
 
-Desktop versions use Flutter or Sciter (deprecated) for GUI. This tutorial is for Sciter only, since it is easier and more friendly to start. Check out our [CI](https://github.com/rustdesk/rustdesk/blob/master/.github/workflows/flutter-build.yml) for building the Flutter version.
+Code: [`libs/hbb_common/src/quic.rs`](libs/hbb_common/src/quic.rs), `connect_direct` in
+[`src/ultra_pin.rs`](src/ultra_pin.rs), `direct_server` in [`src/rendezvous_mediator.rs`](src/rendezvous_mediator.rs).
 
-Please download Sciter dynamic library yourself.
+### Low latency
 
-[Windows](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.win/x64/sciter.dll) |
-[Linux](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so) |
-[macOS](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.osx/libsciter.dylib)
+- 60 FPS for every new viewer by default, up to 144 FPS; quality and FPS are never capped to 30.
+- Network QoS still lowers the frame rate on a slow link and raises it back.
+- RustDesk's hardware encoders/decoders stay enabled in the builds.
 
-## Raw Steps to build
+---
 
-- Prepare your Rust development env and C++ build env
+## How to connect
 
-- Install [vcpkg](https://github.com/microsoft/vcpkg), and set `VCPKG_ROOT` env variable correctly
+1. **Install** Ultra RustDesk on both devices.
+2. On the device you want to control, make sure **TCP and UDP port 21118** are reachable from the other
+   device: same LAN, a public/IPv6 address, or a port forward on the router.
+3. On the controlling device, type the address into the ID field: `192.168.1.20`, `203.0.113.7:21118` or
+   `myhost.example.com:21118`, and connect.
+4. **First connection:** the key of that address is pinned. Compare the fingerprint in the log or on the
+   remote device's *Settings → About* if you want to be sure.
+5. The connection window shows which transport won (`QUIC` or `TCP`).
 
-  - Windows: vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
-  - Linux/macOS: vcpkg install libvpx libyuv opus aom
+If the remote device was reinstalled, its key changes and the connection is refused. Remove its entry
+from `ultra_pins.json` in the config folder (Windows: `%AppData%\RustDesk\config\`, Linux:
+`~/.config/rustdesk/`) and connect again.
 
-- run `cargo run`
+---
 
-## [Build](https://rustdesk.com/docs/en/dev/build/)
+## Downloads and builds
 
-## How to Build on Linux
+Builds are made by GitHub Actions ([`.github/workflows/ultra-build.yml`](.github/workflows/ultra-build.yml)):
 
-### Ubuntu 18 (Debian 10)
+- **Actions → Ultra RustDesk Build → Run workflow** builds everything and publishes it to the
+  `ultra-nightly` release;
+- pushing a tag like `v1.5.1-ultra.1` publishes a release with that name.
 
-```sh
-sudo apt install -y zip g++ gcc git curl wget nasm yasm libgtk-3-dev clang libxcb-randr0-dev libxdo-dev \
-        libxfixes-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libpulse-dev cmake make \
-        libclang-dev ninja-build libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
-```
+Building locally follows the upstream instructions: <https://rustdesk.com/docs/en/dev/build/>.
+Ultra RustDesk needs **Rust 1.85 or newer** (QUIC library).
 
-### openSUSE Tumbleweed
+---
 
-```sh
-sudo zypper install gcc-c++ git curl wget nasm yasm gcc gtk3-devel clang libxcb-devel libXfixes-devel cmake alsa-lib-devel gstreamer-devel gstreamer-plugins-base-devel xdotool-devel
-```
+## Current limitations
 
-### Fedora 28 (CentOS 8)
+- If **both** devices are behind carrier-grade NAT (typical for mobile internet), a direct connection is
+  impossible; a relay you host yourself is on the roadmap.
+- Connecting **to** a phone over mobile internet usually needs that relay as well.
+- Direct mode does not interoperate with stock RustDesk: a stock client cannot complete the encrypted
+  handshake, by design.
+- The first key is pinned automatically; a confirmation dialog with a short code on both screens is planned.
+- Internally the app still uses the `RustDesk` name for its service and config folder.
 
-```sh
-sudo yum -y install gcc-c++ git curl wget nasm yasm gcc gtk3-devel clang libxcb-devel libxdo-devel libXfixes-devel pulseaudio-libs-devel cmake alsa-lib-devel gstreamer1-devel gstreamer1-plugins-base-devel
-```
+## Roadmap
 
-### Arch (Manjaro)
+| Transport / feature | Status |
+|---|---|
+| TCP direct, end-to-end encrypted, pinned keys | ✅ done |
+| QUIC direct (HTTP/3-like, BBR), raced against TCP | ✅ done |
+| 60 FPS default, 144 FPS max | ✅ done |
+| Obfuscated QUIC inspired by Hysteria2 (packet obfuscation, fixed-rate congestion control on lossy links, port hopping) | planned |
+| TLS 1.3 over TCP 443 that answers like a normal website to unknown clients | planned |
+| WebSocket through a CDN via your own server | planned |
+| Self-hosted relay for NAT-to-NAT | planned |
+| Pairing dialog with a short code; UI to forget a pinned key | planned |
+| LAN device discovery, remembering the winning transport per device, switching transport without dropping the session | planned |
+| UPnP port mapping; renaming the internal service/config | planned |
 
-```sh
-sudo pacman -Syu --needed unzip git cmake gcc curl wget yasm nasm zip make pkg-config clang gtk3 xdotool libxcb libxfixes alsa-lib pipewire
-```
+Design notes: [`docs/ULTRA_DESIGN.md`](docs/ULTRA_DESIGN.md).
 
-### Install vcpkg
+---
 
-```sh
-git clone https://github.com/microsoft/vcpkg
-cd vcpkg
-git checkout 2023.04.15
-cd ..
-vcpkg/bootstrap-vcpkg.sh
-export VCPKG_ROOT=$HOME/vcpkg
-vcpkg/vcpkg install libvpx libyuv opus aom
-```
+## License and credits
 
-### Fix libvpx (For Fedora)
+Ultra RustDesk is distributed under the **GNU AGPL-3.0**, like RustDesk ([LICENCE](LICENCE)).
 
-```sh
-cd vcpkg/buildtrees/libvpx/src
-cd *
-./configure
-sed -i 's/CFLAGS+=-I/CFLAGS+=-fPIC -I/g' Makefile
-sed -i 's/CXXFLAGS+=-I/CXXFLAGS+=-fPIC -I/g' Makefile
-make
-cp libvpx.a $HOME/vcpkg/installed/x64-linux/lib/
-cd
-```
-
-### Build
-
-```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-git clone --recurse-submodules https://github.com/rustdesk/rustdesk
-cd rustdesk
-mkdir -p target/debug
-wget https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so
-mv libsciter-gtk.so target/debug
-VCPKG_ROOT=$HOME/vcpkg cargo run
-```
-
-## How to build with Docker
-
-Begin by cloning the repository and building the Docker container:
-
-```sh
-git clone https://github.com/rustdesk/rustdesk
-cd rustdesk
-git submodule update --init --recursive
-docker build -t "rustdesk-builder" .
-```
-
-Then, each time you need to build the application, run the following command:
-
-```sh
-docker run --rm -it -v $PWD:/home/user/rustdesk -v rustdesk-git-cache:/home/user/.cargo/git -v rustdesk-registry-cache:/home/user/.cargo/registry -e PUID="$(id -u)" -e PGID="$(id -g)" rustdesk-builder
-```
-
-Note that the first build may take longer before dependencies are cached, subsequent builds will be faster. Additionally, if you need to specify different arguments to the build command, you may do so at the end of the command in the `<OPTIONAL-ARGS>` position. For instance, if you wanted to build an optimized release version, you would run the command above followed by `--release`. The resulting executable will be available in the target folder on your system, and can be run with:
-
-```sh
-target/debug/rustdesk
-```
-
-Or, if you're running a release executable:
-
-```sh
-target/release/rustdesk
-```
-
-Please ensure that you run these commands from the root of the RustDesk repository, or the application may not find the required resources. Also note that other cargo subcommands such as `install` or `run` are not currently supported via this method as they would install or run the program inside the container instead of the host.
-
-## File Structure
-
-- **[libs/hbb_common](https://github.com/rustdesk/rustdesk/tree/master/libs/hbb_common)**: video codec, config, tcp/udp wrapper, and some other utility functions shared with the server
-- **[libs/base](https://github.com/rustdesk/rustdesk/tree/master/libs/base)**: protobuf, fs functions for file transfer, keyboard and platform code used only by this app
-- **[libs/scrap](https://github.com/rustdesk/rustdesk/tree/master/libs/scrap)**: screen capture
-- **[libs/enigo](https://github.com/rustdesk/rustdesk/tree/master/libs/enigo)**: platform specific keyboard/mouse control
-- **[libs/clipboard](https://github.com/rustdesk/rustdesk/tree/master/libs/clipboard)**: file copy and paste implementation for Windows, Linux, macOS.
-- **[src/ui](https://github.com/rustdesk/rustdesk/tree/master/src/ui)**: obsolete Sciter UI (deprecated)
-- **[src/server](https://github.com/rustdesk/rustdesk/tree/master/src/server)**: audio/clipboard/input/video services, and network connections
-- **[src/client.rs](https://github.com/rustdesk/rustdesk/tree/master/src/client.rs)**: start a peer connection
-- **[src/rendezvous_mediator.rs](https://github.com/rustdesk/rustdesk/tree/master/src/rendezvous_mediator.rs)**: Communicate with [rustdesk-server](https://github.com/rustdesk/rustdesk-server), wait for remote direct (TCP hole punching) or relayed connection
-- **[src/platform](https://github.com/rustdesk/rustdesk/tree/master/src/platform)**: platform specific code
-- **[flutter](https://github.com/rustdesk/rustdesk/tree/master/flutter)**: Flutter code for desktop and mobile
-
-## Screenshots
-
-![Connection Manager](https://github.com/rustdesk/rustdesk/assets/28412477/db82d4e7-c4bc-4823-8e6f-6af7eadf7651)
-
-![Connected to a Windows PC](https://github.com/rustdesk/rustdesk/assets/28412477/9baa91e9-3362-4d06-aa1a-7518edcbd7ea)
-
-![File Transfer](https://github.com/rustdesk/rustdesk/assets/28412477/39511ad3-aa9a-4f8c-8947-1cce286a46ad)
-
-![TCP Tunneling](https://github.com/rustdesk/rustdesk/assets/28412477/78e8708f-e87e-4570-8373-1360033ea6c5)
-
+- Fork and changes: **eturnercus**
+- Based on RustDesk, © Purslane Tech Pte. Ltd. and contributors — <https://github.com/rustdesk/rustdesk>
+- QUIC: [quinn](https://github.com/quinn-rs/quinn). The planned obfuscated transport borrows ideas from
+  [Hysteria](https://github.com/apernet/hysteria) (MIT) and is not wire-compatible with it.

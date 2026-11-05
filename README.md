@@ -84,14 +84,15 @@ Code: [`libs/hbb_common/src/quic.rs`](libs/hbb_common/src/quic.rs), `connect_dir
    the router supports UPnP). On a LAN you can also just pick the device on the **LAN** tab.
 3. On the controlling device, type the address into the ID field: `192.168.1.20`, `203.0.113.7:21118` or
    `myhost.example.com:21118`, and connect.
-4. **First connection:** the key of that address is pinned. Compare the fingerprint in the log or on the
-   remote device's *Settings → About* if you want to be sure.
+4. **First connection:** a dialog shows a 6-digit pairing code. The remote device shows its own code
+   as the first 6 digits of its fingerprint in *Settings → About*. Press **Continue** only if they
+   match; **Disconnect** forgets the key.
 5. The connection window shows which transport won (`QUIC` or `TCP`).
 
 If the remote device was reinstalled, its key changes and the connection is refused. Open the device's
 menu (⋮) in the Recent / Favorites / LAN list and choose **Forget pinned key**, then connect again.
-The keys live in `ultra_pins.json` in the config folder (Windows: `%AppData%\RustDesk\config\`,
-Linux: `~/.config/rustdesk/`).
+The keys live in `ultra_pins.json` in the config folder (Windows: `%AppData%\UltraRustDesk\config\`,
+Linux: `~/.config/ultrarustdesk/`), separate from a stock RustDesk's settings.
 
 ---
 
@@ -111,12 +112,11 @@ Ultra RustDesk needs **Rust 1.85 or newer** (QUIC library).
 ## Current limitations
 
 - If **both** devices are behind carrier-grade NAT (typical for mobile internet), a direct connection is
-  impossible; a relay you host yourself is on the roadmap.
-- Connecting **to** a phone over mobile internet usually needs that relay as well.
+  impossible. The same usually applies to connecting **to** a phone over mobile internet.
 - Direct mode does not interoperate with stock RustDesk: a stock client cannot complete the encrypted
   handshake, by design.
-- The first key is pinned automatically; a confirmation dialog with a short code on both screens is planned.
-- Internally the app still uses the `RustDesk` name for its service and config folder.
+- The settings folder is separate, but the Windows service and executable are still named `RustDesk`,
+  so do not install Ultra RustDesk and stock RustDesk as services on the same Windows machine.
 
 ## Roadmap
 
@@ -129,13 +129,13 @@ Ultra RustDesk needs **Rust 1.85 or newer** (QUIC library).
 | UPnP port forwarding | ✅ done |
 | "Forget pinned key" in the device menu | ✅ done |
 | Upstream self-update disabled | ✅ done |
-| Obfuscated QUIC inspired by Hysteria2 (packet obfuscation, fixed-rate congestion control on lossy links, port hopping) | planned |
-| TLS 1.3 over TCP 443 that answers like a normal website to unknown clients | planned |
-| WebSocket through a CDN via your own server | planned |
-| Self-hosted relay for NAT-to-NAT | planned |
-| Pairing dialog with a short code on both screens | planned |
-| Switching transport without dropping the session | planned |
-| Renaming the internal service/config | planned |
+| Pairing code confirmation on the first connection | ✅ done |
+| Own settings folder (`UltraRustDesk`) | ✅ done |
+| Obfuscated QUIC inspired by Hysteria2 | not started |
+| TLS 1.3 over TCP 443 | not started |
+| WebSocket through a CDN | not started |
+| Switching transport without dropping the session | not started |
+| Renaming the Windows service and executables | not started |
 
 Design notes: [`docs/ULTRA_DESIGN.md`](docs/ULTRA_DESIGN.md).
 

@@ -930,8 +930,15 @@ impl Config {
             #[cfg(target_os = "macos")]
             let org = ORG.read().unwrap().clone();
             // /var/root for root
-            if let Some(project) =
-                directories_next::ProjectDirs::from("", &org, &APP_NAME.read().unwrap())
+            // Ultra RustDesk: its own config folder, so it never shares ID, keys or settings
+            // with a stock RustDesk on the same machine.
+            let app_name = APP_NAME.read().unwrap().clone();
+            let dir_name = if app_name == "RustDesk" {
+                "UltraRustDesk".to_owned()
+            } else {
+                app_name
+            };
+            if let Some(project) = directories_next::ProjectDirs::from("", &org, &dir_name)
             {
                 let mut path = patch(project.config_dir().to_path_buf());
                 path.push(p);

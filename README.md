@@ -26,6 +26,9 @@ Platforms: **Windows x64**, **Linux x86_64** (`.deb`, AppImage), **Android** (ar
 | Direct access | off by default | on by default |
 | Default / maximum frame rate | 30 / 120 FPS (30 without your own server) | **60 / 144 FPS** |
 | Needs public RustDesk servers | for ID connections | no, for direct connections |
+| LAN devices found by discovery | connected through a server | **connected directly**, no server |
+| Router port forwarding | manual | **automatic (UPnP)** |
+| Self-updates from rustdesk.com | yes | **disabled** (would replace the fork) |
 | Android package | `com.carriez.flutter_hbb` | `com.eturnercus.ultrarustdesk` (installs next to RustDesk) |
 
 ### End-to-end encryption with pinned keys
@@ -49,7 +52,18 @@ Code: [`src/ultra_pin.rs`](src/ultra_pin.rs).
 - Tuned for latency: BBR congestion control, 16/32 MB flow-control windows so a video frame never waits
   for the receiver, 4 s keep-alive so NAT mappings stay open.
 - The controller starts QUIC immediately and TCP 250 ms later; the first one to finish the encrypted
-  handshake wins. If UDP is blocked, this costs a quarter of a second.
+  handshake wins. If UDP is blocked, this costs a quarter of a second, and only once: the winner is
+  remembered per device, and where TCP won, it starts at once next time.
+
+### LAN and UPnP
+
+- LAN discovery replies carry the direct port. A device found on the **LAN** tab is connected
+  directly even when you click it by ID; its signed ID must match, and its key is pinned under that ID.
+- While direct access is on, the app asks the router (UPnP IGD) to forward the direct port, TCP and
+  UDP, and writes the external address to the log. Set the option `enable-ultra-upnp` to `N` to turn
+  it off.
+
+Code: [`src/ultra_upnp.rs`](src/ultra_upnp.rs), `try_lan_direct` in [`src/ultra_pin.rs`](src/ultra_pin.rs).
 
 Code: [`libs/hbb_common/src/quic.rs`](libs/hbb_common/src/quic.rs), `connect_direct` in
 [`src/ultra_pin.rs`](src/ultra_pin.rs), `direct_server` in [`src/rendezvous_mediator.rs`](src/rendezvous_mediator.rs).
@@ -66,16 +80,18 @@ Code: [`libs/hbb_common/src/quic.rs`](libs/hbb_common/src/quic.rs), `connect_dir
 
 1. **Install** Ultra RustDesk on both devices.
 2. On the device you want to control, make sure **TCP and UDP port 21118** are reachable from the other
-   device: same LAN, a public/IPv6 address, or a port forward on the router.
+   device: same LAN, a public/IPv6 address, or a port forward on the router (done automatically when
+   the router supports UPnP). On a LAN you can also just pick the device on the **LAN** tab.
 3. On the controlling device, type the address into the ID field: `192.168.1.20`, `203.0.113.7:21118` or
    `myhost.example.com:21118`, and connect.
 4. **First connection:** the key of that address is pinned. Compare the fingerprint in the log or on the
    remote device's *Settings → About* if you want to be sure.
 5. The connection window shows which transport won (`QUIC` or `TCP`).
 
-If the remote device was reinstalled, its key changes and the connection is refused. Remove its entry
-from `ultra_pins.json` in the config folder (Windows: `%AppData%\RustDesk\config\`, Linux:
-`~/.config/rustdesk/`) and connect again.
+If the remote device was reinstalled, its key changes and the connection is refused. Open the device's
+menu (⋮) in the Recent / Favorites / LAN list and choose **Forget pinned key**, then connect again.
+The keys live in `ultra_pins.json` in the config folder (Windows: `%AppData%\RustDesk\config\`,
+Linux: `~/.config/rustdesk/`).
 
 ---
 
@@ -109,13 +125,17 @@ Ultra RustDesk needs **Rust 1.85 or newer** (QUIC library).
 | TCP direct, end-to-end encrypted, pinned keys | ✅ done |
 | QUIC direct (HTTP/3-like, BBR), raced against TCP | ✅ done |
 | 60 FPS default, 144 FPS max | ✅ done |
+| Direct connection to LAN-discovered devices; remembering the winning transport | ✅ done |
+| UPnP port forwarding | ✅ done |
+| "Forget pinned key" in the device menu | ✅ done |
+| Upstream self-update disabled | ✅ done |
 | Obfuscated QUIC inspired by Hysteria2 (packet obfuscation, fixed-rate congestion control on lossy links, port hopping) | planned |
 | TLS 1.3 over TCP 443 that answers like a normal website to unknown clients | planned |
 | WebSocket through a CDN via your own server | planned |
 | Self-hosted relay for NAT-to-NAT | planned |
-| Pairing dialog with a short code; UI to forget a pinned key | planned |
-| LAN device discovery, remembering the winning transport per device, switching transport without dropping the session | planned |
-| UPnP port mapping; renaming the internal service/config | planned |
+| Pairing dialog with a short code on both screens | planned |
+| Switching transport without dropping the session | planned |
+| Renaming the internal service/config | planned |
 
 Design notes: [`docs/ULTRA_DESIGN.md`](docs/ULTRA_DESIGN.md).
 

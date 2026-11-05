@@ -37,6 +37,14 @@ const borderColor = Color(0xFF2F65BA);
 class _DesktopHomePageState extends State<DesktopHomePage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final _leftPaneScrollController = ScrollController();
+  // Ultra RustDesk: refreshed, since UPnP reports the external address a little after start.
+  final Stream<String> _ultraCode = () async* {
+    while (true) {
+      yield await bind.mainUltraConnectionCode();
+      await Future.delayed(const Duration(seconds: 15));
+    }
+  }()
+      .asBroadcastStream();
 
   @override
   bool get wantKeepAlive => true;
@@ -92,6 +100,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       buildTip(context),
       if (!isOutgoingOnly) buildIDBoard(context),
       if (!isOutgoingOnly) buildPasswordBoard(context),
+      if (!isOutgoingOnly) buildUltraCodeBoard(context),
       FutureBuilder<Widget>(
         future: Future.value(
             Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
@@ -250,6 +259,58 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           ),
         ],
       ),
+    );
+  }
+
+  /// Ultra RustDesk: the connection code another device types instead of an ID.
+  Widget buildUltraCodeBoard(BuildContext context) {
+    return StreamBuilder<String>(
+      stream: _ultraCode,
+      builder: (context, snapshot) {
+        final code = snapshot.data ?? '';
+        if (code.isEmpty) return const SizedBox.shrink();
+        return Container(
+          margin: const EdgeInsets.only(left: 20, right: 16, top: 6),
+          child: Row(
+            children: [
+              Container(
+                width: 2,
+                height: 40,
+                decoration: const BoxDecoration(color: MyTheme.accent),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 7),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        translate("Connection code"),
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.color
+                                ?.withOpacity(0.5)),
+                      ),
+                      SelectableText(code, style: const TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: translate("Copy to clipboard"),
+                icon: const Icon(Icons.copy, size: 18),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: code));
+                  showToast(translate("Copied"));
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

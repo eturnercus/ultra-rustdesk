@@ -1,7 +1,7 @@
 name: Ultra RustDesk Build
 
 # Builds Windows (x64), Linux (x86_64 + aarch64, deb + AppImage) and Android (apk)
-# and publishes them to the "ultra-nightly" GitHub release.
+# and publishes them to the "ultra-nightly" GitHub release (draft-free prerelease).
 
 on:
   workflow_dispatch:

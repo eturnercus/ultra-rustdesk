@@ -109,7 +109,12 @@ fn hex_to_bytes(s: &str) -> Vec<u8> {
 /// Controlling side of a direct connection: receives the peer's signed identity, checks its
 /// signing key against the pin store, and keys the stream. Fails closed: a direct session never
 /// proceeds unencrypted. Returns the peer's signing key.
-pub async fn secure_direct_connection(peer: &str, conn: &mut Stream) -> ResultType<Vec<u8>> {
+/// With `expected_id`, the identity the peer signed must be that ID (LAN peers found by ID).
+pub async fn secure_direct_connection(
+    peer: &str,
+    expected_id: Option<&str>,
+    conn: &mut Stream,
+) -> ResultType<Vec<u8>> {
     let bytes = match timeout(HANDSHAKE_TIMEOUT_MS, conn.next()).await? {
         Some(res) => res?,
         None => bail!("Direct handshake: connection closed before the peer identity arrived"),
@@ -127,7 +132,12 @@ pub async fn secure_direct_connection(peer: &str, conn: &mut Stream) -> ResultTy
     pk.copy_from_slice(&si.direct_sign_pk);
     let sign_pk = sign::PublicKey(pk);
     // Verify before pinning, so a garbage blob never ends up in the pin store.
-    let (_id, their_pk_b, _fp, kx_version) = crate::common::decode_id_pk_dtls(&si.id, &sign_pk)?;
+    let (id, their_pk_b, _fp, kx_version) = crate::common::decode_id_pk_dtls(&si.id, &sign_pk)?;
+    if let Some(expected) = expected_id {
+        if id != expected {
+            bail!("Direct handshake: the device at this address is {}, not {}", id, expected);
+        }
+    }
     check_and_pin(peer, &pk)?;
 
     let (asymmetric_value, symmetric_value, key) =
@@ -160,11 +170,43 @@ pub async fn secure_direct_connection(peer: &str, conn: &mut Stream) -> ResultTy
 /// How long QUIC gets on its own before TCP joins the race. QUIC usually wins (lower latency,
 /// no head-of-line blocking); where UDP is blocked this is all the delay TCP costs.
 const TCP_HEAD_START_MS: u64 = 250;
+const TRANSPORTS_FILE: &str = "ultra_transports.json";
+
+/// The transport that won the last connection to `peer`, if any.
+fn last_transport(peer: &str) -> Option<String> {
+    let path = Config::path(TRANSPORTS_FILE);
+    let map: HashMap<String, String> = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())?;
+    map.get(&pin_key(peer)).cloned()
+}
+
+fn remember_transport(peer: &str, transport: &str) {
+    let _guard = PINS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let path = Config::path(TRANSPORTS_FILE);
+    let mut map: HashMap<String, String> = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
+    if map.get(&pin_key(peer)).map(String::as_str) == Some(transport) {
+        return;
+    }
+    map.insert(pin_key(peer), transport.to_owned());
+    if let Ok(s) = serde_json::to_string_pretty(&map) {
+        if let Err(e) = std::fs::write(&path, s) {
+            log::warn!("Failed to store {}: {}", path.display(), e);
+        }
+    }
+}
 
 /// Connects to a direct peer over QUIC and TCP at once, runs the pinned-key handshake on each,
 /// and keeps whichever finishes first. Returns the stream, the peer signing key and the
 /// transport name. A key mismatch on either path is reported over any other failure.
-pub async fn connect_direct(peer: &str, target: String) -> ResultType<(Stream, Vec<u8>, &'static str)> {
+pub async fn connect_direct(
+    peer: &str,
+    expected_id: Option<&str>,
+    target: String,
+) -> ResultType<(Stream, Vec<u8>, &'static str)> {
     use hbb_common::{config::CONNECT_TIMEOUT, futures::future::{select, Either}, quic, socket_client::connect_tcp_local};
 
     let quic = async {
@@ -173,19 +215,26 @@ pub async fn connect_direct(peer: &str, target: String) -> ResultType<(Stream, V
             .next()
             .ok_or_else(|| anyhow!("cannot resolve {}", target))?;
         let mut s = Stream::Tcp(quic::connect(addr, quic::DEFAULT_SNI, CONNECT_TIMEOUT).await?);
-        let pk = secure_direct_connection(peer, &mut s).await?;
+        let pk = secure_direct_connection(peer, expected_id, &mut s).await?;
         Ok::<_, hbb_common::anyhow::Error>((s, pk, "QUIC"))
     };
+    // Where TCP won last time (UDP blocked or worse), do not make it wait for QUIC again.
+    let tcp_delay = if last_transport(peer).as_deref() == Some("TCP") {
+        0
+    } else {
+        TCP_HEAD_START_MS
+    };
     let tcp = async {
-        hbb_common::tokio::time::sleep(std::time::Duration::from_millis(TCP_HEAD_START_MS)).await;
+        hbb_common::tokio::time::sleep(std::time::Duration::from_millis(tcp_delay)).await;
         let mut s = connect_tcp_local(target.clone(), None, CONNECT_TIMEOUT).await?;
-        let pk = secure_direct_connection(peer, &mut s).await?;
+        let pk = secure_direct_connection(peer, expected_id, &mut s).await?;
         Ok::<_, hbb_common::anyhow::Error>((s, pk, "TCP"))
     };
     let (quic, tcp) = (Box::pin(quic), Box::pin(tcp));
     let (first_err, rest) = match select(quic, tcp).await {
         Either::Left((Ok(x), _)) | Either::Right((Ok(x), _)) => {
             log::info!("Direct connection to {} over {}", peer, x.2);
+            remember_transport(peer, x.2);
             return Ok(x);
         }
         Either::Left((Err(e), tcp)) => (e, Either::Left(tcp)),
@@ -198,6 +247,7 @@ pub async fn connect_direct(peer: &str, target: String) -> ResultType<(Stream, V
     match second {
         Ok(x) => {
             log::info!("Direct connection to {} over {} (other path: {})", peer, x.2, first_err);
+            remember_transport(peer, x.2);
             Ok(x)
         }
         Err(second_err) => {
@@ -211,6 +261,35 @@ pub async fn connect_direct(peer: &str, target: String) -> ResultType<(Stream, V
             }
         }
     }
+}
+
+const LAN_DIRECT_TIMEOUT_MS: u64 = 3_000;
+
+/// For a peer typed by ID: when LAN discovery found it with a direct port, connects to it
+/// directly, with no server involved. `None` means "not on the LAN, use the usual path"; a key
+/// mismatch is returned as an error so it is never silently bypassed through a server.
+pub async fn try_lan_direct(id: &str) -> Option<ResultType<(Stream, Vec<u8>, &'static str)>> {
+    let peer = hbb_common::config::LanPeers::load()
+        .peers
+        .into_iter()
+        .find(|p| p.id == id && p.direct_port > 0)?;
+    let pin_name = format!("id:{}", id);
+    for ip in peer.ip_mac.keys() {
+        let Ok(ip) = ip.parse::<std::net::IpAddr>() else {
+            continue;
+        };
+        let target = std::net::SocketAddr::new(ip, peer.direct_port).to_string();
+        match timeout(LAN_DIRECT_TIMEOUT_MS, connect_direct(&pin_name, Some(id), target.clone())).await {
+            Ok(Ok(x)) => {
+                log::info!("LAN direct connection to {} at {}", id, target);
+                return Some(Ok(x));
+            }
+            Ok(Err(e)) if e.to_string().starts_with("SECURITY") => return Some(Err(e)),
+            Ok(Err(e)) => log::info!("LAN direct connection to {} at {} failed: {}", id, target, e),
+            Err(_) => log::info!("LAN direct connection to {} at {} timed out", id, target),
+        }
+    }
+    None
 }
 
 #[cfg(test)]

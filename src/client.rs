@@ -446,7 +446,15 @@ impl Client {
                 peer.to_owned()
             };
             // QUIC and TCP are raced; the first to finish the encrypted handshake wins.
-            let (conn, pk, transport) = crate::ultra_pin::connect_direct(peer, target).await?;
+            let (conn, pk, transport) = crate::ultra_pin::connect_direct(peer, None, target).await?;
+            return Ok((
+                (conn, true, Some(pk), None, transport),
+                (0, "".to_owned()),
+                false,
+            ));
+        }
+        if let Some(res) = crate::ultra_pin::try_lan_direct(peer).await {
+            let (conn, pk, transport) = res?;
             return Ok((
                 (conn, true, Some(pk), None, transport),
                 (0, "".to_owned()),

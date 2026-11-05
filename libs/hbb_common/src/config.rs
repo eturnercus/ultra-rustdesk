@@ -2401,6 +2401,9 @@ pub struct DiscoveryPeer {
     pub online: bool,
     #[serde(default, deserialize_with = "deserialize_hashmap_string_string")]
     pub ip_mac: HashMap<String, String>,
+    /// Ultra RustDesk: the peer's direct-access port (TCP + QUIC), 0 when it has none.
+    #[serde(default)]
+    pub direct_port: u16,
 }
 
 impl DiscoveryPeer {

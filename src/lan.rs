@@ -59,6 +59,7 @@ pub(super) fn start_listening() -> ResultType<()> {
                                     hostname,
                                     username: crate::platform::get_active_username(),
                                     platform: whoami::platform().to_string(),
+                                    misc: crate::rendezvous_mediator::ultra_direct_advert(),
                                     ..Default::default()
                                 };
                                 msg_out.set_peer_discovery(peer);
@@ -280,6 +281,7 @@ fn wait_response(
                                     hostname: p.hostname.clone(),
                                     platform: p.platform.clone(),
                                     online: true,
+                                    direct_port: crate::rendezvous_mediator::parse_ultra_direct_advert(&p.misc),
                                 }));
                             }
                         }
@@ -328,6 +330,9 @@ async fn handle_received_peers(mut rx: UnboundedReceiver<config::DiscoveryPeer>)
                         if in_response_set {
                             peer.ip_mac.extend(peer1.ip_mac);
                             peer.online = true;
+                            if peer.direct_port == 0 {
+                                peer.direct_port = peer1.direct_port;
+                            }
                         }
                     }
                     peers.insert(0, peer);

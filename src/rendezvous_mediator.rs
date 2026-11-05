@@ -1341,7 +1341,37 @@ impl RendezvousMediator {
     }
 }
 
-fn get_direct_port() -> i32 {
+/// Ultra RustDesk: what LAN discovery advertises in `PeerDiscovery.misc` so a LAN peer can be
+/// reached directly; empty when direct access is off.
+pub(crate) fn ultra_direct_advert() -> String {
+    if option2bool(OPTION_DIRECT_SERVER, &Config::get_option(OPTION_DIRECT_SERVER))
+        && !option2bool("stop-service", &Config::get_option("stop-service"))
+    {
+        format!("{}{}", ULTRA_DIRECT_ADVERT_PREFIX, get_direct_port())
+    } else {
+        String::new()
+    }
+}
+
+pub(crate) const ULTRA_DIRECT_ADVERT_PREFIX: &str = "ultra-direct:";
+
+/// The direct port while direct access is on, else 0: what UPnP keeps forwarded.
+fn ultra_wanted_direct_port() -> u16 {
+    if ultra_direct_advert().is_empty() {
+        0
+    } else {
+        get_direct_port() as u16
+    }
+}
+
+/// Parses what [`ultra_direct_advert`] produced; 0 when absent or invalid.
+pub(crate) fn parse_ultra_direct_advert(misc: &str) -> u16 {
+    misc.strip_prefix(ULTRA_DIRECT_ADVERT_PREFIX)
+        .and_then(|p| p.trim().parse::<u16>().ok())
+        .unwrap_or(0)
+}
+
+pub(crate) fn get_direct_port() -> i32 {
     let mut port = Config::get_option("direct-access-port")
         .parse::<i32>()
         .unwrap_or(0);
@@ -1370,6 +1400,7 @@ async fn direct_server(server: ServerPtr) {
                         "Direct server listening on: {:?}",
                         listener.as_ref().map(|l| l.local_addr())
                     );
+                    crate::ultra_upnp::keep_mapped(port as u16, ultra_wanted_direct_port);
                     quic = match hbb_common::quic::Listener::bind(port as u16) {
                         Ok(q) => {
                             log::info!("Direct QUIC listening on: {:?}", q.local_addr());

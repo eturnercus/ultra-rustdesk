@@ -1043,8 +1043,11 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
     }
 }
 
+/// Ultra RustDesk ships its own builds; upstream update checks are off.
+const ULTRA_DISABLE_UPSTREAM_UPDATES: bool = true;
+
 pub fn check_software_update() {
-    if is_custom_client() {
+    if ULTRA_DISABLE_UPSTREAM_UPDATES || is_custom_client() {
         return;
     }
     let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
@@ -1163,6 +1166,11 @@ fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
 // Because the url is always `https://api.rustdesk.com/version/latest`.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
+    // Ultra RustDesk: never ask api.rustdesk.com for updates. An "update" from there would be
+    // stock RustDesk and would replace this fork (and its encrypted direct mode).
+    if ULTRA_DISABLE_UPSTREAM_UPDATES {
+        return Ok(());
+    }
     let (request, url) =
         hbb_common::version_check_request(hbb_common::VER_TYPE_RUSTDESK_CLIENT.to_string());
     let proxy_conf = Config::get_socks();

@@ -89,6 +89,18 @@ Code: [`libs/hbb_common/src/quic.rs`](libs/hbb_common/src/quic.rs), `connect_dir
    match; **Disconnect** forgets the key.
 5. The connection window shows which transport won (`QUIC` or `TCP`).
 
+### From a phone, with a connection code and a password
+
+1. On the PC: **Settings → Security → Set permanent password**.
+2. On the PC: open **Settings → About** and copy the **Connection code** (`UR…`). It contains the PC's
+   external address (from UPnP), the direct port and a hash of the PC's key.
+3. On the phone: type the code into the ID field, connect and enter the password. The key is checked
+   against the code, so no pairing dialog appears.
+
+The code changes when your provider gives the PC a new external address; copy it again then. Without
+UPnP the code holds the LAN address and works only inside that network. Behind carrier-grade NAT (no
+public address) the PC cannot be reached from outside.
+
 If the remote device was reinstalled, its key changes and the connection is refused. Open the device's
 menu (⋮) in the Recent / Favorites / LAN list and choose **Forget pinned key**, then connect again.
 The keys live in `ultra_pins.json` in the config folder (Windows: `%AppData%\UltraRustDesk\config\`,
@@ -131,6 +143,7 @@ Ultra RustDesk needs **Rust 1.85 or newer** (QUIC library).
 | Upstream self-update disabled | ✅ done |
 | Pairing code confirmation on the first connection | ✅ done |
 | Own settings folder (`UltraRustDesk`) | ✅ done |
+| Connection code (address + key hash) instead of an ID | ✅ done |
 | Obfuscated QUIC inspired by Hysteria2 | not started |
 | TLS 1.3 over TCP 443 | not started |
 | WebSocket through a CDN | not started |

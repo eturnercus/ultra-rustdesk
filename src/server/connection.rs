@@ -185,6 +185,9 @@ async fn login_deadline(authorized: bool, started: Instant) {
     time::sleep_until(started + LOGIN_GRACE).await
 }
 
+/// Ultra RustDesk: the frame rate a viewer gets until it asks for another.
+const ULTRA_DEFAULT_FPS: u32 = 60;
+
 lazy_static::lazy_static! {
     // Connections between accept and authorization, oldest first; see admit_unauthorized.
     static ref UNAUTHORIZED_CONNS: Mutex<Vec<(i32, IpAddr, Arc<UnauthorizedShared>)>> = Default::default();
@@ -6956,10 +6959,11 @@ mod raii {
                 shutdown_hooks::add_shutdown_hook(connection_shutdown_hook);
             });
             if conn_type == AuthConnType::Remote || conn_type == AuthConnType::ViewCamera {
-                video_service::VIDEO_QOS
-                    .lock()
-                    .unwrap()
-                    .on_connection_open(conn_id);
+                let mut qos = video_service::VIDEO_QOS.lock().unwrap();
+                qos.on_connection_open(conn_id);
+                // Ultra RustDesk: 60 FPS by default; QoS still lowers it on a slow link, and a
+                // viewer's own FPS setting, sent later, replaces it.
+                qos.user_custom_fps(conn_id, ULTRA_DEFAULT_FPS);
             }
             Self(conn_id, conn_type)
         }

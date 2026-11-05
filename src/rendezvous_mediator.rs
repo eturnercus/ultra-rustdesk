@@ -1353,6 +1353,8 @@ fn get_direct_port() -> i32 {
 
 async fn direct_server(server: ServerPtr) {
     let mut listener = None;
+    // Ultra RustDesk: QUIC on the same port number (UDP), raced by the controller against TCP.
+    let mut quic: Option<hbb_common::quic::Listener> = None;
     let mut port = 0;
     loop {
         let disabled = !option2bool(
@@ -1368,6 +1370,16 @@ async fn direct_server(server: ServerPtr) {
                         "Direct server listening on: {:?}",
                         listener.as_ref().map(|l| l.local_addr())
                     );
+                    quic = match hbb_common::quic::Listener::bind(port as u16) {
+                        Ok(q) => {
+                            log::info!("Direct QUIC listening on: {:?}", q.local_addr());
+                            Some(q)
+                        }
+                        Err(err) => {
+                            log::warn!("Failed to start direct QUIC on UDP {}: {}", port, err);
+                            None
+                        }
+                    };
                 }
                 Err(err) => {
                     // to-do: pass to ui
@@ -1389,9 +1401,40 @@ async fn direct_server(server: ServerPtr) {
             if disabled || port != get_direct_port() {
                 log::info!("Exit direct access listen");
                 listener = None;
+                quic = None;
                 continue;
             }
-            if let Ok(Ok((stream, addr))) = hbb_common::timeout(1000, l.accept()).await {
+            let quic_accept = async {
+                match quic.as_ref() {
+                    Some(q) => q.accept().await,
+                    None => std::future::pending().await,
+                }
+            };
+            let tcp_accept = hbb_common::timeout(1000, l.accept());
+            let accepted = tokio::select! {
+                res = tcp_accept => Some(res),
+                Some((stream, addr)) = quic_accept => {
+                    log::info!("direct QUIC access from {}", addr);
+                    let server = server.clone();
+                    tokio::spawn(async move {
+                        allow_err!(
+                            crate::server::create_tcp_connection(
+                                server,
+                                hbb_common::Stream::Tcp(stream),
+                                addr,
+                                true,
+                                ConnectionMeta::default(),
+                            )
+                            .await
+                        );
+                    });
+                    None
+                }
+            };
+            let Some(accepted) = accepted else {
+                continue;
+            };
+            if let Ok(Ok((stream, addr))) = accepted {
                 stream.set_nodelay(true).ok();
                 log::info!("direct access from {}", addr);
                 let local_addr = stream

@@ -445,10 +445,10 @@ impl Client {
             } else {
                 peer.to_owned()
             };
-            let mut conn = connect_tcp_local(target, None, CONNECT_TIMEOUT).await?;
-            let pk = crate::ultra_pin::secure_direct_connection(peer, &mut conn).await?;
+            // QUIC and TCP are raced; the first to finish the encrypted handshake wins.
+            let (conn, pk, transport) = crate::ultra_pin::connect_direct(peer, target).await?;
             return Ok((
-                (conn, true, Some(pk), None, "TCP"),
+                (conn, true, Some(pk), None, transport),
                 (0, "".to_owned()),
                 false,
             ));
@@ -3371,7 +3371,8 @@ impl LoginConfigHandler {
             msg.image_quality = q.into();
         } else if q == "custom" {
             let config = self.load_config();
-            let allow_more = !crate::using_public_server() || self.direct == Some(true);
+            // Ultra RustDesk: no public relay to protect, so high quality and FPS are always allowed.
+            let allow_more = true;
             let quality = if config.custom_image_quality.is_empty() {
                 50
             } else {

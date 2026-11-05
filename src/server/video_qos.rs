@@ -48,9 +48,10 @@ delay:
 */
 
 // Constants
-pub const FPS: u32 = 30;
+// Ultra RustDesk: 60 FPS by default (QoS still lowers it on a slow link), up to 144.
+pub const FPS: u32 = 60;
 pub const MIN_FPS: u32 = 1;
-pub const MAX_FPS: u32 = 120;
+pub const MAX_FPS: u32 = 144;
 pub const INIT_FPS: u32 = 15;
 const MIN_AUTO_FPS: u32 = 5;
 

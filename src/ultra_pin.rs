@@ -156,6 +156,62 @@ pub async fn secure_direct_connection(peer: &str, conn: &mut Stream) -> ResultTy
     Ok(pk.to_vec())
 }
 
+/// How long QUIC gets on its own before TCP joins the race. QUIC usually wins (lower latency,
+/// no head-of-line blocking); where UDP is blocked this is all the delay TCP costs.
+const TCP_HEAD_START_MS: u64 = 250;
+
+/// Connects to a direct peer over QUIC and TCP at once, runs the pinned-key handshake on each,
+/// and keeps whichever finishes first. Returns the stream, the peer signing key and the
+/// transport name. A key mismatch on either path is reported over any other failure.
+pub async fn connect_direct(peer: &str, target: String) -> ResultType<(Stream, Vec<u8>, &'static str)> {
+    use hbb_common::{config::CONNECT_TIMEOUT, futures::future::{select, Either}, quic, socket_client::connect_tcp_local};
+
+    let quic = async {
+        let addr = hbb_common::tokio::net::lookup_host(target.as_str())
+            .await?
+            .next()
+            .ok_or_else(|| anyhow!("cannot resolve {}", target))?;
+        let mut s = Stream::Tcp(quic::connect(addr, quic::DEFAULT_SNI, CONNECT_TIMEOUT).await?);
+        let pk = secure_direct_connection(peer, &mut s).await?;
+        ResultType::Ok((s, pk, "QUIC"))
+    };
+    let tcp = async {
+        hbb_common::tokio::time::sleep(std::time::Duration::from_millis(TCP_HEAD_START_MS)).await;
+        let mut s = connect_tcp_local(target.clone(), None, CONNECT_TIMEOUT).await?;
+        let pk = secure_direct_connection(peer, &mut s).await?;
+        ResultType::Ok((s, pk, "TCP"))
+    };
+    let (quic, tcp) = (Box::pin(quic), Box::pin(tcp));
+    let (first_err, rest) = match select(quic, tcp).await {
+        Either::Left((Ok(x), _)) | Either::Right((Ok(x), _)) => {
+            log::info!("Direct connection to {} over {}", peer, x.2);
+            return Ok(x);
+        }
+        Either::Left((Err(e), tcp)) => (e, Either::Left(tcp)),
+        Either::Right((Err(e), quic)) => (e, Either::Right(quic)),
+    };
+    let second = match rest {
+        Either::Left(tcp) => tcp.await,
+        Either::Right(quic) => quic.await,
+    };
+    match second {
+        Ok(x) => {
+            log::info!("Direct connection to {} over {} (other path: {})", peer, x.2, first_err);
+            Ok(x)
+        }
+        Err(second_err) => {
+            let security = |e: &hbb_common::anyhow::Error| e.to_string().starts_with("SECURITY");
+            if security(&second_err) {
+                Err(second_err)
+            } else if security(&first_err) {
+                Err(first_err)
+            } else {
+                bail!("Direct connection failed: {}; {}", first_err, second_err)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -18,6 +18,7 @@ pub use tokio_util;
 pub mod proxy;
 pub mod socket_client;
 pub mod tcp;
+pub mod quic;
 pub mod udp;
 pub use env_logger;
 pub use log;

@@ -13,6 +13,9 @@ const double kDesktopRemoteTabBarHeight = 28.0;
 const int kInvalidWindowId = -1;
 const int kMainWindowId = 0;
 
+const kUltraAppName = 'Ultra RustDesk';
+const kUltraForkAuthor = 'eturnercus';
+
 const kAllDisplayValue = -1;
 
 const kKeyLegacyMode = 'legacy';

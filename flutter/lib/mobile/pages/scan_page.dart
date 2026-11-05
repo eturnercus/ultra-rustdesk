@@ -147,6 +147,15 @@ class _ScanPageState extends State<ScanPage> {
   }
 
   void showServerSettingFromQr(String data) async {
+    // Ultra RustDesk: a connection code shown as QR on the other device.
+    final code = data.trim();
+    if (code.length > 2 && code.substring(0, 2).toUpperCase() == 'UR') {
+      await controller?.pauseCamera();
+      if (mounted) Navigator.pop(context);
+      final ctx = globalKey.currentContext;
+      if (ctx != null) connect(ctx, code);
+      return;
+    }
     closeConnection();
     await controller?.pauseCamera();
     if (!data.startsWith('config=')) {

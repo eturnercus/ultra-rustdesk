@@ -20,6 +20,7 @@ import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
@@ -300,6 +301,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 ),
               ),
               IconButton(
+                tooltip: translate("Connection code"),
+                icon: const Icon(Icons.qr_code, size: 18),
+                onPressed: () => _showUltraCodeQr(code),
+              ),
+              IconButton(
                 tooltip: translate("Copy to clipboard"),
                 icon: const Icon(Icons.copy, size: 18),
                 onPressed: () {
@@ -312,6 +318,32 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         );
       },
     );
+  }
+
+  void _showUltraCodeQr(String code) {
+    gFFI.dialogManager.show((setState, close, context) => CustomAlertDialog(
+          title: Text(translate("Connection code")),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 240,
+                height: 240,
+                child: QrImageView(
+                  backgroundColor: Colors.white,
+                  data: code,
+                  version: QrVersions.auto,
+                  size: 240,
+                  gapless: false,
+                ),
+              ).marginOnly(bottom: 8),
+              SelectableText(code, style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+          actions: [dialogButton("OK", onPressed: close)],
+          onSubmit: close,
+          onCancel: close,
+        ));
   }
 
   Widget buildPopupMenu(BuildContext context) {

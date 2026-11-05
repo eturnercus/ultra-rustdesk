@@ -50,7 +50,8 @@ class HomePageState extends State<HomePage> {
     _pages.clear();
     if (!bind.isIncomingOnly()) {
       _pages.add(ConnectionPage(
-        appBarActions: [],
+        // Ultra RustDesk: scan another device's connection code to connect.
+        appBarActions: [ScanButton()],
       ));
     }
     if (isAndroid && !bind.isOutgoingOnly()) {

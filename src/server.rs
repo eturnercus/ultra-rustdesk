@@ -300,6 +300,8 @@ async fn identity_handshake(stream: &mut Stream, secure: bool) -> ResultType<()>
                 &sk,
             )
             .into(),
+            // Ultra RustDesk: lets a direct (serverless) controller pin our key.
+            direct_sign_pk: Bytes::from(pk.clone()),
             ..Default::default()
         });
         timeout(CONNECT_TIMEOUT, stream.send(&msg_out)).await??;

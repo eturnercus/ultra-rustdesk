@@ -1404,7 +1404,8 @@ async fn direct_server(server: ServerPtr) {
                             server,
                             hbb_common::Stream::from(stream, local_addr),
                             addr,
-                            false,
+                            // Ultra RustDesk: direct connections are end-to-end encrypted too.
+                            true,
                             ConnectionMeta::default(), // Direct connections don't have server-side user context.
                         )
                         .await

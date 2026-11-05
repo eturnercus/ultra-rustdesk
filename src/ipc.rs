@@ -985,11 +985,9 @@ async fn handle(data: Data, stream: &mut Connection) {
                 } else if name == "rendezvous_servers" {
                     value = Some(Config::get_rendezvous_servers().join(","));
                 } else if name == "fingerprint" {
-                    value = if Config::get_key_confirmed() {
-                        Some(crate::common::pk_to_fingerprint(Config::get_key_pair().1))
-                    } else {
-                        None
-                    };
+                    // Ultra RustDesk: always shown, so it can be compared with the key a direct
+                    // controller pinned (no rendezvous server confirms it).
+                    value = Some(crate::common::pk_to_fingerprint(Config::get_key_pair().1));
                 } else if name == "hide_cm" {
                     value = if crate::hbbs_http::sync::is_pro() || crate::common::is_custom_client()
                     {

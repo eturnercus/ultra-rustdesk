@@ -717,7 +717,11 @@ message PublicKey {
   uint32 kx_version = 3;
 }
 
-message SignedId { bytes id = 1; }
+message SignedId {
+  bytes id = 1;
+  // Ultra RustDesk: the signer's Ed25519 public key, so a direct (serverless) peer can pin it.
+  bytes direct_sign_pk = 2;
+}
 
 message AudioFormat {
   uint32 sample_rate = 1;

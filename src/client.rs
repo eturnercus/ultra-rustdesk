@@ -437,30 +437,18 @@ impl Client {
             bail!("Incoming only mode");
         }
         // to-do: remember the port for each peer, so that we can retry easier
-        if hbb_common::is_ip_str(peer) {
+        // Ultra RustDesk: direct connections are always end-to-end encrypted, with the peer key
+        // pinned on first use (see ultra_pin.rs). They never fall back to plaintext.
+        if hbb_common::is_ip_str(peer) || hbb_common::is_domain_port_str(peer) {
+            let target = if hbb_common::is_ip_str(peer) {
+                check_port(peer, RELAY_PORT + 1)
+            } else {
+                peer.to_owned()
+            };
+            let mut conn = connect_tcp_local(target, None, CONNECT_TIMEOUT).await?;
+            let pk = crate::ultra_pin::secure_direct_connection(peer, &mut conn).await?;
             return Ok((
-                (
-                    connect_tcp_local(check_port(peer, RELAY_PORT + 1), None, CONNECT_TIMEOUT)
-                        .await?,
-                    true,
-                    None,
-                    None,
-                    "TCP",
-                ),
-                (0, "".to_owned()),
-                false,
-            ));
-        }
-        // Allow connect to {domain}:{port}
-        if hbb_common::is_domain_port_str(peer) {
-            return Ok((
-                (
-                    connect_tcp_local(peer, None, CONNECT_TIMEOUT).await?,
-                    true,
-                    None,
-                    None,
-                    "TCP",
-                ),
+                (conn, true, Some(pk), None, "TCP"),
                 (0, "".to_owned()),
                 false,
             ));

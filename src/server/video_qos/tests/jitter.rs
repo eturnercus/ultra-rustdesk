@@ -47,6 +47,8 @@ fn unavailable_abr_or_minimum_bitrate_does_not_prevent_fps_reduction() {
 #[test]
 fn severe_delay_and_timeout_bypass_bitrate_cooldown() {
     let mut qos = abr_session();
+    // Ultra RustDesk raised the default cap to 60; these expectations are for a 30 FPS cap.
+    qos.user_custom_fps(1, 30);
     qos.adjust_ratio_instant = qos.now();
     qos.user_network_delay(1, 1200);
     assert_eq!(qos.fps(), 15);
@@ -105,7 +107,10 @@ fn viewers_confirm_congestion_independently() {
 #[test]
 fn a_congested_viewer_does_not_lower_another_viewers_target() {
     let mut qos = stable_qos();
+    // Ultra RustDesk raised the default cap to 60; these expectations are for a 30 FPS cap.
+    qos.user_custom_fps(1, 30);
     qos.users.insert(2, UserData::default());
+    qos.user_custom_fps(2, 30);
     for _ in 0..30 {
         qos.user_network_delay(2, 10);
         qos.user_network_delay(1, 10);

@@ -85,6 +85,7 @@ pub fn check_and_pin(peer: &str, pk: &[u8]) -> ResultType<PinResult> {
 }
 
 /// Forgets the key pinned for `peer`, so the next connection pins afresh.
+#[allow(dead_code)] // wired to the UI in a later step
 pub fn remove_pin(peer: &str) -> ResultType<bool> {
     let _guard = PINS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut pins = load_pins();

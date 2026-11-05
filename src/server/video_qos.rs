@@ -919,6 +919,8 @@ mod tests {
     #[test]
     fn response_timeout_recovers_in_two_good_replies() {
         let mut qos = stable_qos();
+        // Ultra RustDesk raised the default cap to 60; these expectations are for a 30 FPS cap.
+        qos.user_custom_fps(1, 30);
         qos.user_delay_response_elapsed(1, 3000);
         assert_eq!(qos.fps(), 7);
         qos.user_network_delay(1, 3200);
@@ -941,19 +943,21 @@ mod tests {
             "the second good reply restores the frame rate"
         );
         qos.user_network_delay(1, 10);
-        assert_eq!(qos.fps(), FPS, "the third keeps the restored frame rate");
+        assert_eq!(qos.fps(), 30, "the third keeps the restored frame rate");
     }
 
     #[test]
     fn restore_aims_lower_after_a_restore_that_congested() {
         let mut qos = stable_qos();
+        // Ultra RustDesk raised the default cap to 60; these expectations are for a 30 FPS cap.
+        qos.user_custom_fps(1, 30);
         for _ in 0..2 {
             qos.user_network_delay(1, 1200);
         }
         assert_eq!(qos.fps(), 8);
         qos.user_network_delay(1, 10);
         qos.user_network_delay(1, 10);
-        assert_eq!(qos.fps(), FPS);
+        assert_eq!(qos.fps(), 30);
         // The restored level congests at once, so the next restore aims lower.
         for _ in 0..3 {
             qos.user_network_delay(1, 400);
@@ -967,7 +971,7 @@ mod tests {
             qos.fps()
         );
         qos.user_network_delay(1, 10);
-        assert_eq!(qos.fps(), FPS, "ordinary recovery can still reach the cap");
+        assert_eq!(qos.fps(), 30, "ordinary recovery can still reach the cap");
     }
 
     mod adaptation;

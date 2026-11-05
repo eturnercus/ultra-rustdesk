@@ -22,6 +22,7 @@ use quinn::{
     },
     Endpoint, IdleTimeout, RecvStream, SendStream, TransportConfig, VarInt,
 };
+use std::convert::TryFrom;
 use std::{
     io,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
@@ -166,7 +167,7 @@ pub async fn connect(addr: SocketAddr, sni: &str, timeout_ms: u64) -> ResultType
         let conn = endpoint.connect(addr, sni)?.await?;
         let (mut send, recv) = conn.open_bi().await?;
         send.write_all(PREAMBLE).await?;
-        ResultType::Ok((conn, send, recv))
+        Ok::<_, anyhow::Error>((conn, send, recv))
     };
     let (conn, send, recv) = match crate::timeout(timeout_ms, fut).await {
         Ok(res) => res?,

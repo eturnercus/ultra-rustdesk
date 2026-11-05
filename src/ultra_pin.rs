@@ -173,13 +173,13 @@ pub async fn connect_direct(peer: &str, target: String) -> ResultType<(Stream, V
             .ok_or_else(|| anyhow!("cannot resolve {}", target))?;
         let mut s = Stream::Tcp(quic::connect(addr, quic::DEFAULT_SNI, CONNECT_TIMEOUT).await?);
         let pk = secure_direct_connection(peer, &mut s).await?;
-        ResultType::Ok((s, pk, "QUIC"))
+        Ok::<_, hbb_common::anyhow::Error>((s, pk, "QUIC"))
     };
     let tcp = async {
         hbb_common::tokio::time::sleep(std::time::Duration::from_millis(TCP_HEAD_START_MS)).await;
         let mut s = connect_tcp_local(target.clone(), None, CONNECT_TIMEOUT).await?;
         let pk = secure_direct_connection(peer, &mut s).await?;
-        ResultType::Ok((s, pk, "TCP"))
+        Ok::<_, hbb_common::anyhow::Error>((s, pk, "TCP"))
     };
     let (quic, tcp) = (Box::pin(quic), Box::pin(tcp));
     let (first_err, rest) = match select(quic, tcp).await {

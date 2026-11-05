@@ -830,5 +830,6 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("ultra-no-pin-tip", ""),
         ("Confirm device", ""),
         ("ultra-pair_tip", ""),
+        ("Connection code", ""),
     ].iter().cloned().collect();
 }

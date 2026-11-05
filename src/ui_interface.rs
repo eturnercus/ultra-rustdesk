@@ -1364,6 +1364,17 @@ pub fn get_user_default_option(key: String) -> String {
     UserDefaultConfig::load().get(&key)
 }
 
+/// Ultra RustDesk: what another device types instead of an ID to reach this one directly.
+pub fn get_ultra_connection_code() -> String {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    return crate::ultra_pin::my_connection_code();
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    return ipc::get_config("ultra_connection_code")
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+}
+
 pub fn get_fingerprint() -> String {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {

@@ -1102,6 +1102,10 @@ class RustdeskImpl {
     throw UnimplementedError("mainGetNewStoredPeers");
   }
 
+  Future<String> mainUltraConnectionCode({dynamic hint}) {
+    return Future.value('');
+  }
+
   Future<bool> mainUltraForgetPin({required String id, dynamic hint}) {
     return Future.value(false);
   }

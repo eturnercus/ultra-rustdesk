@@ -1875,6 +1875,11 @@ pub fn main_device_name(name: String) {
     *crate::common::DEVICE_NAME.lock().unwrap() = name;
 }
 
+/// Ultra RustDesk: this device's connection code (empty when direct access is off).
+pub fn main_ultra_connection_code() -> String {
+    crate::ui_interface::get_ultra_connection_code()
+}
+
 /// Ultra RustDesk: forgets the key pinned for a peer (by address or by LAN ID). True if one was.
 pub fn main_ultra_forget_pin(id: String) -> bool {
     crate::ultra_pin::forget(&id)

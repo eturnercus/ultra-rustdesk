@@ -2578,7 +2578,10 @@ class _AboutState extends State<_About> {
       final buildDate = await bind.mainGetBuildDate();
       final fingerprint = await bind.mainGetFingerprint();
       final myId = await bind.mainGetMyId();
+      final connectionCode =
+          isWeb ? '' : await bind.mainUltraConnectionCode();
       return {
+        'connectionCode': connectionCode,
         'license': license,
         'version': version,
         'buildDate': buildDate,
@@ -2590,6 +2593,7 @@ class _AboutState extends State<_About> {
       final version = data['version'].toString();
       final buildDate = data['buildDate'].toString();
       final fingerprint = data['fingerprint'].toString();
+      final connectionCode = data['connectionCode'].toString();
       final myId = data['myId'].toString();
       const linkStyle = TextStyle(decoration: TextDecoration.underline);
       final scrollController = ScrollController();
@@ -2608,6 +2612,11 @@ class _AboutState extends State<_About> {
               SelectionArea(
                   child: Text('${translate('Build Date')}: $buildDate')
                       .marginSymmetric(vertical: 4.0)),
+              if (connectionCode.isNotEmpty)
+                SelectionArea(
+                    child: Text(
+                            '${translate('Connection code')}: $connectionCode')
+                        .marginSymmetric(vertical: 4.0)),
               if (!isWeb)
                 SelectionArea(
                     child: Text('${translate('Fingerprint')}: $fingerprint')

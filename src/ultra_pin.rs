@@ -99,7 +99,9 @@ fn pin_key(peer: &str) -> String {
 }
 
 /// Checks `pk` against the key pinned for `peer`, pinning it when there is none yet.
-pub fn check_and_pin(peer: &str, pk: &[u8]) -> ResultType<PinResult> {
+/// `confirmed`: the key was already verified (a connection code carries its hash), so the user
+/// is not asked to compare pairing codes.
+pub fn check_and_pin(peer: &str, pk: &[u8], confirmed: bool) -> ResultType<PinResult> {
     let _guard = PINS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let key = pin_key(peer);
     let hex = hex_of(pk);
@@ -116,10 +118,12 @@ pub fn check_and_pin(peer: &str, pk: &[u8]) -> ResultType<PinResult> {
         None => {
             pins.insert(key.clone(), hex);
             store_pins(&pins)?;
-            UNCONFIRMED
+            if !confirmed {
+                UNCONFIRMED
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .push((key.clone(), pairing_code(pk)));
+            }
             log::info!(
                 "Pinned key of {}: {}",
                 key,
@@ -171,6 +175,7 @@ fn hex_to_bytes(s: &str) -> Vec<u8> {
 pub async fn secure_direct_connection(
     peer: &str,
     expected_id: Option<&str>,
+    expected_key: Option<[u8; CODE_KEY_HASH_LEN]>,
     conn: &mut Stream,
 ) -> ResultType<Vec<u8>> {
     let bytes = match timeout(HANDSHAKE_TIMEOUT_MS, conn.next()).await? {
@@ -196,7 +201,12 @@ pub async fn secure_direct_connection(
             bail!("Direct handshake: the device at this address is {}, not {}", id, expected);
         }
     }
-    check_and_pin(peer, &pk)?;
+    if let Some(expected) = expected_key {
+        if key_hash(&pk) != expected {
+            bail!("SECURITY: the device at this address does not have the key its connection code names. Possible man-in-the-middle, or the code is outdated; the connection was refused.");
+        }
+    }
+    check_and_pin(peer, &pk, expected_key.is_some())?;
 
     let (asymmetric_value, symmetric_value, key) =
         crate::common::create_symmetric_key_msg(their_pk_b);
@@ -263,6 +273,7 @@ fn remember_transport(peer: &str, transport: &str) {
 pub async fn connect_direct(
     peer: &str,
     expected_id: Option<&str>,
+    expected_key: Option<[u8; CODE_KEY_HASH_LEN]>,
     target: String,
 ) -> ResultType<(Stream, Vec<u8>, &'static str)> {
     use hbb_common::{config::CONNECT_TIMEOUT, futures::future::{select, Either}, quic, socket_client::connect_tcp_local};
@@ -273,7 +284,7 @@ pub async fn connect_direct(
             .next()
             .ok_or_else(|| anyhow!("cannot resolve {}", target))?;
         let mut s = Stream::Tcp(quic::connect(addr, quic::DEFAULT_SNI, CONNECT_TIMEOUT).await?);
-        let pk = secure_direct_connection(peer, expected_id, &mut s).await?;
+        let pk = secure_direct_connection(peer, expected_id, expected_key, &mut s).await?;
         Ok::<_, hbb_common::anyhow::Error>((s, pk, "QUIC"))
     };
     // Where TCP won last time (UDP blocked or worse), do not make it wait for QUIC again.
@@ -285,7 +296,7 @@ pub async fn connect_direct(
     let tcp = async {
         hbb_common::tokio::time::sleep(std::time::Duration::from_millis(tcp_delay)).await;
         let mut s = connect_tcp_local(target.clone(), None, CONNECT_TIMEOUT).await?;
-        let pk = secure_direct_connection(peer, expected_id, &mut s).await?;
+        let pk = secure_direct_connection(peer, expected_id, expected_key, &mut s).await?;
         Ok::<_, hbb_common::anyhow::Error>((s, pk, "TCP"))
     };
     let (quic, tcp) = (Box::pin(quic), Box::pin(tcp));
@@ -337,7 +348,7 @@ pub async fn try_lan_direct(id: &str) -> Option<ResultType<(Stream, Vec<u8>, &'s
             continue;
         };
         let target = std::net::SocketAddr::new(ip, peer.direct_port).to_string();
-        match timeout(LAN_DIRECT_TIMEOUT_MS, connect_direct(&pin_name, Some(id), target.clone())).await {
+        match timeout(LAN_DIRECT_TIMEOUT_MS, connect_direct(&pin_name, Some(id), None, target.clone())).await {
             Ok(Ok(x)) => {
                 log::info!("LAN direct connection to {} at {}", id, target);
                 return Some(Ok(x));
@@ -350,6 +361,128 @@ pub async fn try_lan_direct(id: &str) -> Option<ResultType<(Stream, Vec<u8>, &'s
     None
 }
 
+// ---------------------------------------------------------------- connection codes
+//
+// A connection code is what a user types instead of an ID when no server is used:
+// "UR" + base32(kind, address, port, first bytes of SHA-256 of the signing key). The key hash
+// lets the controller verify the device on the first connection without a pairing dialog.
+
+const CODE_PREFIX: &str = "UR";
+const CODE_KEY_HASH_LEN: usize = 6;
+const B32: &[u8; 32] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+/// Where the UPnP thread leaves the router's external address for the code.
+pub const OPTION_EXTERNAL_IP: &str = "ultra-external-ip";
+
+fn key_hash(pk: &[u8]) -> [u8; CODE_KEY_HASH_LEN] {
+    use hbb_common::sha2::{Digest, Sha256};
+    let h = Sha256::digest(pk);
+    let mut out = [0u8; CODE_KEY_HASH_LEN];
+    out.copy_from_slice(&h[..CODE_KEY_HASH_LEN]);
+    out
+}
+
+fn b32_encode(data: &[u8]) -> String {
+    let mut out = String::new();
+    let (mut buf, mut bits) = (0u32, 0u32);
+    for &b in data {
+        buf = (buf << 8) | b as u32;
+        bits += 8;
+        while bits >= 5 {
+            bits -= 5;
+            out.push(B32[((buf >> bits) & 31) as usize] as char);
+        }
+    }
+    if bits > 0 {
+        out.push(B32[((buf << (5 - bits)) & 31) as usize] as char);
+    }
+    out
+}
+
+fn b32_decode(s: &str) -> Option<Vec<u8>> {
+    let mut out = Vec::new();
+    let (mut buf, mut bits) = (0u32, 0u32);
+    for c in s.bytes() {
+        let v = B32.iter().position(|&x| x == c.to_ascii_uppercase())? as u32;
+        buf = (buf << 5) | v;
+        bits += 5;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((buf >> bits) as u8);
+        }
+    }
+    Some(out)
+}
+
+pub fn encode_connection_code(addr: std::net::SocketAddr, pk: &[u8]) -> String {
+    let mut data = Vec::new();
+    match addr.ip() {
+        std::net::IpAddr::V4(ip) => {
+            data.push(4);
+            data.extend_from_slice(&ip.octets());
+        }
+        std::net::IpAddr::V6(ip) => {
+            data.push(6);
+            data.extend_from_slice(&ip.octets());
+        }
+    }
+    data.extend_from_slice(&addr.port().to_be_bytes());
+    data.extend_from_slice(&key_hash(pk));
+    format!("{}{}", CODE_PREFIX, b32_encode(&data))
+}
+
+/// The address and key hash in a connection code; `None` if `code` is not one.
+pub fn decode_connection_code(code: &str) -> Option<(std::net::SocketAddr, [u8; CODE_KEY_HASH_LEN])> {
+    let code: String = code.chars().filter(|c| !c.is_whitespace() && *c != '-').collect();
+    if !code.is_ascii() || code.len() < CODE_PREFIX.len() || !code[..CODE_PREFIX.len()].eq_ignore_ascii_case(CODE_PREFIX) {
+        return None;
+    }
+    let data = b32_decode(&code[CODE_PREFIX.len()..])?;
+    let ip_len = match data.first()? {
+        4 => 4,
+        6 => 16,
+        _ => return None,
+    };
+    if data.len() != 1 + ip_len + 2 + CODE_KEY_HASH_LEN {
+        return None;
+    }
+    let ip: std::net::IpAddr = if ip_len == 4 {
+        <[u8; 4]>::try_from(&data[1..5]).ok()?.into()
+    } else {
+        <[u8; 16]>::try_from(&data[1..17]).ok()?.into()
+    };
+    let port = u16::from_be_bytes([data[1 + ip_len], data[2 + ip_len]]);
+    let mut hash = [0u8; CODE_KEY_HASH_LEN];
+    hash.copy_from_slice(&data[3 + ip_len..]);
+    Some((std::net::SocketAddr::new(ip, port), hash))
+}
+
+/// This device's connection code: the router's external address when UPnP reported one,
+/// otherwise the LAN address (then the code only works inside this network). Empty when direct
+/// access is off.
+#[cfg(not(target_os = "ios"))]
+pub fn my_connection_code() -> String {
+    if crate::rendezvous_mediator::ultra_direct_advert().is_empty() {
+        return String::new();
+    }
+    let port = crate::rendezvous_mediator::get_direct_port() as u16;
+    let ip = Config::get_option(OPTION_EXTERNAL_IP)
+        .parse::<std::net::IpAddr>()
+        .ok()
+        .or_else(|| {
+            let s = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+            // No packet is sent: connecting a UDP socket only picks the outgoing interface.
+            s.connect("8.8.8.8:80").ok()?;
+            Some(s.local_addr().ok()?.ip())
+        });
+    match ip {
+        Some(ip) => encode_connection_code(
+            std::net::SocketAddr::new(ip, port),
+            &Config::get_key_pair().1,
+        ),
+        None => String::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,6 +491,18 @@ mod tests {
     fn pin_key_normalises_default_port() {
         assert_eq!(pin_key("10.0.0.5"), pin_key("10.0.0.5:21118"));
         assert_ne!(pin_key("10.0.0.5"), pin_key("10.0.0.5:9000"));
+    }
+
+    #[test]
+    fn connection_code_round_trip() {
+        let addr: std::net::SocketAddr = "203.0.113.7:21118".parse().unwrap();
+        let code = encode_connection_code(addr, b"some signing key");
+        assert!(code.starts_with("UR"));
+        let (a, h) = decode_connection_code(&code.to_lowercase()).unwrap();
+        assert_eq!(a, addr);
+        assert_eq!(h, key_hash(b"some signing key"));
+        assert!(decode_connection_code("123456789").is_none());
+        assert!(decode_connection_code("192.168.1.2").is_none());
     }
 
     #[test]

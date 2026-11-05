@@ -446,7 +446,18 @@ impl Client {
                 peer.to_owned()
             };
             // QUIC and TCP are raced; the first to finish the encrypted handshake wins.
-            let (conn, pk, transport) = crate::ultra_pin::connect_direct(peer, None, target).await?;
+            let (conn, pk, transport) =
+                crate::ultra_pin::connect_direct(peer, None, None, target).await?;
+            return Ok((
+                (conn, true, Some(pk), None, transport),
+                (0, "".to_owned()),
+                false,
+            ));
+        }
+        // Ultra RustDesk: a connection code ("UR...") names the address and the key directly.
+        if let Some((addr, key)) = crate::ultra_pin::decode_connection_code(peer) {
+            let (conn, pk, transport) =
+                crate::ultra_pin::connect_direct(peer, None, Some(key), addr.to_string()).await?;
             return Ok((
                 (conn, true, Some(pk), None, transport),
                 (0, "".to_owned()),

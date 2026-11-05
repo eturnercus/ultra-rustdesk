@@ -59,12 +59,15 @@ pub fn keep_mapped(port: u16, still_wanted: fn() -> u16) {
                 if let Some(g) = gateway.as_ref() {
                     match g.map(port) {
                         Ok(()) => match g.external_ip() {
-                            Ok(ip) => log::info!(
-                                "UPnP: port {} (TCP+UDP) forwarded, reachable at {}:{}",
-                                port,
-                                ip,
-                                port
-                            ),
+                            Ok(ip) => {
+                                log::info!(
+                                    "UPnP: port {} (TCP+UDP) forwarded, reachable at {}:{}",
+                                    port,
+                                    ip,
+                                    port
+                                );
+                                set_external_ip(&ip);
+                            }
                             Err(_) => log::info!("UPnP: port {} (TCP+UDP) forwarded", port),
                         },
                         Err(e) => {
@@ -82,11 +85,20 @@ pub fn keep_mapped(port: u16, still_wanted: fn() -> u16) {
             if let Some(g) = gateway.as_ref() {
                 g.unmap(port);
             }
+            set_external_ip("");
             let _ = MAPPED_PORT.compare_exchange(port, 0, Ordering::SeqCst, Ordering::SeqCst);
         });
     if let Err(e) = spawned {
         log::warn!("UPnP: cannot start thread: {}", e);
         MAPPED_PORT.store(0, Ordering::SeqCst);
+    }
+}
+
+/// Lets the connection code use the router's public address.
+fn set_external_ip(ip: &str) {
+    let valid = ip.is_empty() || ip.parse::<IpAddr>().map(|a| !a.is_unspecified()).unwrap_or(false);
+    if valid && Config::get_option(crate::ultra_pin::OPTION_EXTERNAL_IP) != ip {
+        Config::set_option(crate::ultra_pin::OPTION_EXTERNAL_IP.to_owned(), ip.to_owned());
     }
 }
 

@@ -91,6 +91,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
   var _localIP = "";
   var _directAccessPort = "";
   var _fingerprint = "";
+  var _connectionCode = "";
   var _buildDate = "";
   var _myId = "";
   var _autoDisconnectTimeout = "";
@@ -218,6 +219,12 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
       if (_fingerprint != fingerprint) {
         update = true;
         _fingerprint = fingerprint;
+      }
+
+      final connectionCode = await bind.mainUltraConnectionCode();
+      if (_connectionCode != connectionCode) {
+        update = true;
+        _connectionCode = connectionCode;
       }
 
       final buildDate = await bind.mainGetBuildDate();
@@ -1088,6 +1095,15 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
                     child: Text(_fingerprint),
                   ),
                   leading: Icon(Icons.fingerprint)),
+            if (isAndroid && _connectionCode.isNotEmpty)
+              SettingsTile(
+                  onPressed: (context) => onCopyFingerprint(_connectionCode),
+                  title: Text(translate("Connection code")),
+                  value: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(_connectionCode),
+                  ),
+                  leading: Icon(Icons.link)),
             SettingsTile(
                 onPressed: (context) => onCopyId(_myId),
                 title: Text(translate("ID")),

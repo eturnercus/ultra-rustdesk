@@ -248,6 +248,16 @@ impl<T: InvokeUiSession> Remote<T> {
                     self.handle_disconnected(round);
                     return;
                 }
+                if let Some(code) = crate::ultra_pin::take_unconfirmed(&self.handler.get_id()) {
+                    if !crate::ultra_pin::confirm_pairing(&self.handler, &mut self.receiver, &code)
+                        .await
+                    {
+                        crate::ultra_pin::forget(&self.handler.get_id());
+                        self.send_close_reason(&mut peer, "").await;
+                        self.handle_disconnected(round);
+                        return;
+                    }
+                }
                 self.handler.update_direct(Some(direct));
                 if conn_type == ConnType::DEFAULT_CONN || conn_type == ConnType::VIEW_CAMERA {
                     self.handler

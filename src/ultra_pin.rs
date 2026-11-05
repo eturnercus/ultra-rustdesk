@@ -17,6 +17,48 @@ const PINS_FILE: &str = "ultra_pins.json";
 const HANDSHAKE_TIMEOUT_MS: u64 = 10_000;
 
 static PINS_LOCK: Mutex<()> = Mutex::new(());
+/// Keys pinned during this run that the user has not confirmed yet: (pin key, pairing code).
+static UNCONFIRMED: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+
+/// Six digits derived from a signing key, shown on both devices so the user can compare them.
+pub fn pairing_code(pk: &[u8]) -> String {
+    use hbb_common::sha2::{Digest, Sha256};
+    let h = Sha256::digest(pk);
+    let n = u32::from_be_bytes([0, h[0], h[1], h[2]]) % 1_000_000;
+    format!("{:03} {:03}", n / 1000, n % 1000)
+}
+
+/// The pairing code of a key pinned for `id` (as typed, or found on the LAN) that still awaits
+/// the user's confirmation; taking it clears it.
+pub fn take_unconfirmed(id: &str) -> Option<String> {
+    let names = [pin_key(id), pin_key(&format!("id:{}", id))];
+    let mut list = UNCONFIRMED.lock().unwrap_or_else(|e| e.into_inner());
+    let pos = list.iter().position(|(k, _)| names.contains(k))?;
+    Some(list.remove(pos).1)
+}
+
+/// Asks the user to compare the pairing code with the one the remote device shows.
+pub async fn confirm_pairing(
+    interface: &impl crate::client::Interface,
+    receiver: &mut hbb_common::tokio::sync::mpsc::UnboundedReceiver<crate::client::Data>,
+    code: &str,
+) -> bool {
+    use crate::client::Data;
+    interface.msgbox(
+        "insecure-connection-ultra-pair-nocancel-hasclose",
+        "Confirm device",
+        &format!("ultra-pair_tip {}", code),
+        "",
+    );
+    while let Some(data) = receiver.recv().await {
+        match data {
+            Data::ContinueInsecureConnection => return true,
+            Data::RejectInsecureConnection | Data::Close => return false,
+            _ => {}
+        }
+    }
+    false
+}
 
 /// What became of the peer's key against the pin store.
 #[derive(Debug, PartialEq, Eq)]
@@ -74,6 +116,10 @@ pub fn check_and_pin(peer: &str, pk: &[u8]) -> ResultType<PinResult> {
         None => {
             pins.insert(key.clone(), hex);
             store_pins(&pins)?;
+            UNCONFIRMED
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push((key.clone(), pairing_code(pk)));
             log::info!(
                 "Pinned key of {}: {}",
                 key,

@@ -1366,7 +1366,14 @@ pub fn get_user_default_option(key: String) -> String {
 
 pub fn get_fingerprint() -> String {
     #[cfg(any(target_os = "android", target_os = "ios"))]
-    return crate::common::pk_to_fingerprint(Config::get_key_pair().1);
+    {
+        let pk = Config::get_key_pair().1;
+        return format!(
+            "{} | {}",
+            crate::ultra_pin::pairing_code(&pk),
+            crate::common::pk_to_fingerprint(pk)
+        );
+    }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     return ipc::get_fingerprint();
 }

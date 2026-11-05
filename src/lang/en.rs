@@ -294,5 +294,6 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("install-directory-not-empty-tip", "The selected folder is not empty. Installation may delete existing data. Consider choosing a different folder."),
         ("ultra-pin-forgotten-tip", "The key is forgotten. The next connection pins a new one."),
         ("ultra-no-pin-tip", "No key is pinned for this device."),
+        ("ultra-pair_tip", "First connection to this device. Compare the code below with the one on the remote device (Settings → About, the first 6 digits of the fingerprint). Continue only if they match. Code:"),
     ].iter().cloned().collect();
 }

@@ -33,6 +33,8 @@ fn app_dir_name(exe: &str) -> String {
         .file_stem()
         .and_then(|stem| stem.to_str())
         .map(|stem| stem.trim().to_lowercase())
+        // Ultra RustDesk: the build ships rustdesk.exe; extract apart from a stock RustDesk.
+        .map(|stem| if stem == APP_PREFIX { "ultrarustdesk".to_owned() } else { stem })
         .filter(|stem| !stem.is_empty())
         .unwrap_or_else(|| APP_PREFIX.to_owned())
 }

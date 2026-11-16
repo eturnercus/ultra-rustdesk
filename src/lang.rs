@@ -266,6 +266,12 @@ pub fn translate_locale(name: String, locale: &str) -> String {
                 && name != "powered_by_me"
             {
                 let app_name = crate::get_app_name();
+                // Ultra RustDesk: the internal name has no space; texts read better with one.
+                let app_name = if app_name == "UltraRustDesk" {
+                    "Ultra RustDesk".to_owned()
+                } else {
+                    app_name
+                };
                 if !app_name.contains("RustDesk") {
                     s = s.replace("RustDesk", &app_name);
                 } else {

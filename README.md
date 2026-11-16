@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="res/logo-header.svg" alt="Ultra RustDesk" width="420"><br>
+  <img src="res/scalable.svg" alt="Ultra RustDesk" width="128"><br>
   <b>Ultra RustDesk</b> — a remote desktop built for direct, low-latency connections on difficult networks<br>
   <a href="docs/README-RU.md">Русский</a> | English
 </p>
@@ -13,7 +13,18 @@ It keeps RustDesk's video, input, clipboard and file transfer, and replaces how 
 to each other: direct connections come first, they are always end-to-end encrypted, and several
 transports are tried in parallel so a session starts quickly even when some of them are blocked or slow.
 
-Platforms: **Windows x64**, **Linux x86_64** (`.deb`, AppImage), **Android** (arm64, armv7, x86_64, universal APK).
+Platforms: **Windows x64**, **Linux x86_64** (`.deb`, `.rpm`, Arch, AppImage), **Android** (arm64, armv7, x86_64, universal APK).
+
+**Installs next to a stock RustDesk without touching it.** Everything has its own name:
+
+| | Stock RustDesk | Ultra RustDesk |
+|---|---|---|
+| Windows | `C:\Program Files\RustDesk\RustDesk.exe`, service `RustDesk` | `C:\Program Files\UltraRustDesk\UltraRustDesk.exe`, service `UltraRustDesk` |
+| Linux | `/usr/bin/rustdesk`, `rustdesk.service`, package `rustdesk` | `/usr/bin/ultrarustdesk`, `ultrarustdesk.service`, package `ultrarustdesk` |
+| Android | `com.carriez.flutter_hbb` | `com.eturnercus.ultrarustdesk` |
+| Settings | `%AppData%\RustDesk`, `~/.config/rustdesk` | `%AppData%\UltraRustDesk`, `~/.config/ultrarustdesk` |
+| Links | `rustdesk://` | `ultrarustdesk://` |
+| Icon | RustDesk logo | its own (a monitor with a lightning bolt) |
 
 ---
 
@@ -127,8 +138,8 @@ Ultra RustDesk needs **Rust 1.85 or newer** (QUIC library).
   impossible. The same usually applies to connecting **to** a phone over mobile internet.
 - Direct mode does not interoperate with stock RustDesk: a stock client cannot complete the encrypted
   handshake, by design.
-- The settings folder is separate, but the Windows service and executable are still named `RustDesk`,
-  so do not install Ultra RustDesk and stock RustDesk as services on the same Windows machine.
+- Windows ships as an `.exe` installer only; the upstream MSI is not built, because its WiX project
+  installs a product named RustDesk.
 
 ## Roadmap
 
@@ -142,13 +153,12 @@ Ultra RustDesk needs **Rust 1.85 or newer** (QUIC library).
 | "Forget pinned key" in the device menu | ✅ done |
 | Upstream self-update disabled | ✅ done |
 | Pairing code confirmation on the first connection | ✅ done |
-| Own settings folder (`UltraRustDesk`) | ✅ done |
+| Own name everywhere (service, folders, packages, links) and own icon | ✅ done |
 | Connection code (address + key hash) instead of an ID | ✅ done |
 | Obfuscated QUIC inspired by Hysteria2 | not started |
 | TLS 1.3 over TCP 443 | not started |
 | WebSocket through a CDN | not started |
 | Switching transport without dropping the session | not started |
-| Renaming the Windows service and executables | not started |
 
 Design notes: [`docs/ULTRA_DESIGN.md`](docs/ULTRA_DESIGN.md).
 

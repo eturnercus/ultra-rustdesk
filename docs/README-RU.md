@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="../res/logo-header.svg" alt="Ultra RustDesk" width="420"><br>
+  <img src="../res/scalable.svg" alt="Ultra RustDesk" width="128"><br>
   <b>Ultra RustDesk</b> — удалённый рабочий стол для прямых подключений с минимальной задержкой в сложных сетях<br>
   Русский | <a href="../README.md">English</a>
 </p>
@@ -14,7 +14,18 @@ Ultra RustDesk — форк [RustDesk](https://github.com/rustdesk/rustdesk), а
 end-to-end, а несколько транспортов пробуются параллельно, поэтому сеанс начинается быстро, даже если
 часть из них заблокирована или работает медленно.
 
-Платформы: **Windows x64**, **Linux x86_64** (`.deb`, AppImage), **Android** (arm64, armv7, x86_64, универсальный APK).
+Платформы: **Windows x64**, **Linux x86_64** (`.deb`, `.rpm`, Arch, AppImage), **Android** (arm64, armv7, x86_64, универсальный APK).
+
+**Ставится рядом с обычным RustDesk и никак его не задевает.** У всего своё имя:
+
+| | Обычный RustDesk | Ultra RustDesk |
+|---|---|---|
+| Windows | `C:\Program Files\RustDesk\RustDesk.exe`, служба `RustDesk` | `C:\Program Files\UltraRustDesk\UltraRustDesk.exe`, служба `UltraRustDesk` |
+| Linux | `/usr/bin/rustdesk`, `rustdesk.service`, пакет `rustdesk` | `/usr/bin/ultrarustdesk`, `ultrarustdesk.service`, пакет `ultrarustdesk` |
+| Android | `com.carriez.flutter_hbb` | `com.eturnercus.ultrarustdesk` |
+| Настройки | `%AppData%\RustDesk`, `~/.config/rustdesk` | `%AppData%\UltraRustDesk`, `~/.config/ultrarustdesk` |
+| Ссылки | `rustdesk://` | `ultrarustdesk://` |
+| Иконка | логотип RustDesk | своя (монитор с молнией) |
 
 ---
 
@@ -132,8 +143,8 @@ end-to-end, а несколько транспортов пробуются па
   невозможно. Обычно это касается и подключения **к** телефону через мобильный интернет.
 - **С обычным RustDesk** прямой режим несовместим: стандартный клиент не пройдёт зашифрованное
   рукопожатие. Так задумано.
-- **Служба Windows** и исполняемые файлы пока называются `RustDesk`, хотя папка настроек уже своя.
-  Не устанавливайте Ultra RustDesk и обычный RustDesk службами на один компьютер с Windows.
+- **Windows:** только установщик `.exe`. MSI из RustDesk не собирается: его проект WiX устанавливает
+  продукт с именем RustDesk.
 
 ## Планы
 
@@ -147,13 +158,12 @@ end-to-end, а несколько транспортов пробуются па
 | «Забыть закреплённый ключ» в меню устройства | ✅ готово |
 | Самообновление с rustdesk.com отключено | ✅ готово |
 | Подтверждение кода при первом подключении | ✅ готово |
-| Своя папка настроек (`UltraRustDesk`) | ✅ готово |
+| Своё имя везде (служба, папки, пакеты, ссылки) и своя иконка | ✅ готово |
 | Код подключения (адрес + хеш ключа) вместо ID | ✅ готово |
 | QUIC с маскировкой по мотивам Hysteria2 | не начато |
 | TLS 1.3 по TCP 443 | не начато |
 | WebSocket через CDN | не начато |
 | Смена транспорта без разрыва сеанса | не начато |
-| Переименование службы Windows и исполняемых файлов | не начато |
 
 Заметки по архитектуре: [`docs/ULTRA_DESIGN.md`](ULTRA_DESIGN.md).
 

@@ -15,6 +15,7 @@ mod server;
 pub use self::server::*;
 mod client;
 mod ultra_pin;
+mod ultra_diag;
 #[cfg(not(any(target_os = "ios")))]
 mod ultra_upnp;
 mod lan;

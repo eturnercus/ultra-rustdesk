@@ -217,9 +217,18 @@ impl Listener {
             cfg.clone(),
             (IpAddr::V4(Ipv4Addr::UNSPECIFIED), port).into(),
         )?];
-        match Endpoint::server(cfg, (IpAddr::V6(Ipv6Addr::UNSPECIFIED), port).into()) {
+        // IPv6-only socket: a dual-stack one would clash with the IPv4 socket on the same port
+        // (Linux), and the IPv6 listener would silently not start.
+        match v6_only_udp(port).and_then(|socket| {
+            Endpoint::new(
+                quinn::EndpointConfig::default(),
+                Some(cfg),
+                socket,
+                Arc::new(quinn::TokioRuntime),
+            )
+        }) {
             Ok(e) => endpoints.push(e),
-            Err(e) => log::debug!("QUIC IPv6 listener not started: {}", e),
+            Err(e) => log::warn!("QUIC IPv6 listener not started: {}", e),
         }
         let (tx, rx) = mpsc::channel(16);
         for endpoint in &endpoints {
@@ -244,6 +253,15 @@ impl Listener {
             endpoints,
             rx: Mutex::new(rx),
         })
+    }
+
+    /// "IPv4 and IPv6" or "IPv4 only", for the connection journal.
+    pub fn families(&self) -> &'static str {
+        if self.endpoints.len() > 1 {
+            "IPv4 and IPv6"
+        } else {
+            "IPv4 only"
+        }
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -286,6 +304,18 @@ impl Drop for Listener {
     fn drop(&mut self) {
         self.close();
     }
+}
+
+fn v6_only_udp(port: u16) -> io::Result<std::net::UdpSocket> {
+    use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+    let socket = Socket::new(Domain::ipv6(), Type::dgram(), Some(Protocol::udp()))?;
+    socket.set_only_v6(true)?;
+    socket.bind(&SockAddr::from(SocketAddr::new(
+        IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+        port,
+    )))?;
+    socket.set_nonblocking(true)?;
+    Ok(socket.into_udp_socket())
 }
 
 #[cfg(test)]

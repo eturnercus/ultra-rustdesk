@@ -299,5 +299,6 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("ultra-unreachable-tip", "The remote device did not answer at any address in the code. Check that Ultra RustDesk runs there and that the code is fresh (it changes with the address). From another network it works only if the PC has a public address or IPv6; the PC home screen says so under the code."),
         ("ultra-code-lan-tip", "This code works only inside this local network: the PC has no public address (provider NAT, or a router without UPnP) and no IPv6."),
         ("ultra-code-internet-tip", "The code works from the internet and inside the local network."),
+        ("ultra-diag-tip", "Every connection step, live. TRY: an attempt starts at an address; QUIC/TCP: how each transport ended and how long it took; DNS: addresses of a name; CODE: addresses in a code; LAN: local network; LISTEN: ports open on this device; UPNP: the router; IN: incoming connections; LOGIN: password login; ADDR: this device's addresses. \"timed out\" means packets do not get through (port closed, NAT or firewall), \"refused\" means nothing listens there, \"SECURITY\" means the key did not match."),
     ].iter().cloned().collect();
 }

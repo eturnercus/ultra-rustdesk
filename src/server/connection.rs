@@ -2424,6 +2424,7 @@ impl Connection {
     }
 
     async fn send_login_error<T: std::string::ToString>(&mut self, err: T) {
+        crate::ultra_diag::note("LOGIN", format!("{}: login refused: {}", self.ip, err.to_string()));
         let mut msg_out = Message::new();
         let mut res = LoginResponse::new();
         res.set_error(err.to_string());

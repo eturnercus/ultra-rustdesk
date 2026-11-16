@@ -6,6 +6,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/common/widgets/ultra_diag.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
 import 'package:flutter_hbb/consts.dart';
@@ -313,6 +314,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     ],
                   ),
                 ),
+              ),
+              IconButton(
+                tooltip: translate("Connection log"),
+                icon: const Icon(Icons.terminal, size: 18),
+                onPressed: () => showUltraDiag(gFFI.dialogManager),
               ),
               IconButton(
                 tooltip: translate("Connection code"),

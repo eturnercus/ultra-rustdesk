@@ -87,6 +87,39 @@ Code: [`libs/hbb_common/src/quic.rs`](libs/hbb_common/src/quic.rs), `connect_dir
 
 ---
 
+## All the ways a connection is made
+
+No servers are involved in any of them. Whatever you type, every candidate address is tried at
+once, and on every address QUIC (UDP) and TCP are raced; the first to finish the encrypted handshake
+wins. Nothing waits forever: after 15 seconds you get an error, and the log says why.
+
+| You type / pick | Addresses tried | Works |
+|---|---|---|
+| A device on the **LAN** tab (by ID) | its LAN addresses from discovery | same network |
+| **Connection code** `UR…` (or its QR) | LAN IPv4 + public IPv4 (UPnP, only if really public) + global IPv6 | same network; from the internet when the PC has a public IPv4 or IPv6 |
+| **IPv4 address**, e.g. `192.168.1.20`, `203.0.113.7:21118` | that address | where it is reachable |
+| **IPv6 address**, e.g. `2a01:db8::7`, `[2a01:db8::7]:21118` | that address | where IPv6 reaches it; often works without a public IPv4 |
+| **Host name**, e.g. `myhost.example.com` or `myhost.example.com:21118` | every IPv6 and IPv4 address in DNS | as above |
+| A plain **ID** not on the LAN | none (no servers); you are told to use the code or an address | — |
+
+**IPv6.** The PC listens on IPv6 for both TCP and QUIC and puts its global IPv6 address in the
+connection code. Routers usually block incoming IPv6, so the app asks the router (UPnP IGDv2
+`WANIPv6FirewallControl`) to open the port for this address; if the router cannot, the log says
+so, and the port has to be allowed in the router's IPv6 firewall by hand.
+
+**VPN, Xray and similar.** Ultra RustDesk has no built-in proxy protocols. If a VPN or Xray client
+runs on the device in system / TUN mode, Ultra RustDesk simply uses that network like any other
+program; the PC must still be reachable at the address you connect to.
+
+### Connection log
+
+**Connection log** (the terminal icon next to the connection code on the PC, in the app bar on the
+phone, and a button in every connection error) shows each step live: which address and transport
+was tried, how long it took and why it failed, which ports this device listens on, what the router
+answered over UPnP, incoming attempts and password login results. `timed out` means packets do not
+get through (closed port, NAT or firewall), `refused` means nothing listens there, `SECURITY` means
+the key did not match. Copy it with one button to send it to whoever helps you.
+
 ## How to connect
 
 1. **Install** Ultra RustDesk on both devices.
@@ -159,7 +192,10 @@ Ultra RustDesk needs **Rust 1.85 or newer** (QUIC library).
 | Upstream self-update disabled | ✅ done |
 | Pairing code confirmation on the first connection | ✅ done |
 | Own name everywhere (service, folders, packages, links) and own icon | ✅ done |
-| Connection code (address + key hash) instead of an ID | ✅ done |
+| Connection code (all addresses + key hash) instead of an ID | ✅ done |
+| Serverless by default: public servers never contacted | ✅ done |
+| IPv6 direct (TCP + QUIC), all DNS addresses raced, router IPv6 pinhole | ✅ done |
+| Live connection log | ✅ done |
 | Obfuscated QUIC inspired by Hysteria2 | not started |
 | TLS 1.3 over TCP 443 | not started |
 | WebSocket through a CDN | not started |

@@ -278,7 +278,7 @@ pub async fn connect_direct(
 ) -> ResultType<(Stream, Vec<u8>, &'static str)> {
     use hbb_common::{config::CONNECT_TIMEOUT, futures::future::{select, Either}, quic, socket_client::connect_tcp_local};
 
-    let quic = async {
+    let quic_inner = async {
         let addr = hbb_common::tokio::net::lookup_host(target.as_str())
             .await?
             .next()
@@ -293,11 +293,36 @@ pub async fn connect_direct(
     } else {
         TCP_HEAD_START_MS
     };
-    let tcp = async {
+    let tcp_inner = async {
         hbb_common::tokio::time::sleep(std::time::Duration::from_millis(tcp_delay)).await;
         let mut s = connect_tcp_local(target.clone(), None, CONNECT_TIMEOUT).await?;
         let pk = secure_direct_connection(peer, expected_id, expected_key, &mut s).await?;
         Ok::<_, hbb_common::anyhow::Error>((s, pk, "TCP"))
+    };
+    crate::ultra_diag::note(
+        "TRY",
+        format!("{}: QUIC (UDP) now, TCP after {} ms", target, tcp_delay),
+    );
+    let started = std::time::Instant::now();
+    let report = |name: &'static str, r: &ResultType<(Stream, Vec<u8>, &'static str)>| match r {
+        Ok(_) => crate::ultra_diag::note(
+            name,
+            format!("{}: encrypted handshake done in {} ms", target, crate::ultra_diag::ms(started)),
+        ),
+        Err(e) => crate::ultra_diag::note(
+            name,
+            format!("{}: failed after {} ms: {}", target, crate::ultra_diag::ms(started), e),
+        ),
+    };
+    let quic = async {
+        let r = quic_inner.await;
+        report("QUIC", &r);
+        r
+    };
+    let tcp = async {
+        let r = tcp_inner.await;
+        report("TCP", &r);
+        r
     };
     let (quic, tcp) = (Box::pin(quic), Box::pin(tcp));
     let (first_err, rest) = match select(quic, tcp).await {
@@ -350,12 +375,12 @@ pub async fn try_lan_direct(id: &str) -> Option<ResultType<(Stream, Vec<u8>, &'s
         let target = std::net::SocketAddr::new(ip, peer.direct_port).to_string();
         match timeout(LAN_DIRECT_TIMEOUT_MS, connect_direct(&pin_name, Some(id), None, target.clone())).await {
             Ok(Ok(x)) => {
-                log::info!("LAN direct connection to {} at {}", id, target);
+                crate::ultra_diag::note("LAN", format!("{} connected directly at {}", id, target));
                 return Some(Ok(x));
             }
             Ok(Err(e)) if e.to_string().starts_with("SECURITY") => return Some(Err(e)),
-            Ok(Err(e)) => log::info!("LAN direct connection to {} at {} failed: {}", id, target, e),
-            Err(_) => log::info!("LAN direct connection to {} at {} timed out", id, target),
+            Ok(Err(e)) => crate::ultra_diag::note("LAN", format!("{} at {} failed: {}", id, target, e)),
+            Err(_) => crate::ultra_diag::note("LAN", format!("{} at {}: no answer in {} ms", id, target, LAN_DIRECT_TIMEOUT_MS)),
         }
     }
     None
@@ -519,6 +544,15 @@ fn outgoing_ip(bind: &str, probe: &str) -> Option<std::net::IpAddr> {
     Some(s.local_addr().ok()?.ip())
 }
 
+/// This device's global IPv6 address, if it has one.
+#[cfg(not(target_os = "ios"))]
+pub fn my_global_ipv6() -> Option<std::net::Ipv6Addr> {
+    match outgoing_ip("[::]:0", "[2001:4860:4860::8888]:80")? {
+        std::net::IpAddr::V6(ip) if is_public_ip(&std::net::IpAddr::V6(ip)) => Some(ip),
+        _ => None,
+    }
+}
+
 /// Every address this device can be reached at: its LAN IPv4 (works inside this network), the
 /// router's public IPv4 from UPnP (only when it really is public, not carrier-grade NAT) and a
 /// global IPv6 address (often reachable even without a public IPv4).
@@ -550,11 +584,45 @@ pub fn my_connection_code() -> String {
         return String::new();
     }
     let ips = my_addresses();
+    note_addresses(&ips);
     if ips.is_empty() {
         return String::new();
     }
     let port = crate::rendezvous_mediator::get_direct_port() as u16;
     encode_connection_code(&ips, port, &Config::get_key_pair().1)
+}
+
+#[cfg(not(target_os = "ios"))]
+fn note_addresses(ips: &[std::net::IpAddr]) {
+    static LAST: Mutex<Option<Vec<std::net::IpAddr>>> = Mutex::new(None);
+    let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+    if last.as_deref() == Some(ips) {
+        return;
+    }
+    *last = Some(ips.to_vec());
+    let describe = |ip: &std::net::IpAddr| match ip {
+        std::net::IpAddr::V6(_) => format!("{} (IPv6, internet)", ip),
+        _ if is_public_ip(ip) => format!("{} (public IPv4, internet)", ip),
+        _ => format!("{} (LAN only)", ip),
+    };
+    let external = Config::get_option(OPTION_EXTERNAL_IP);
+    let mut msg = if ips.is_empty() {
+        "no usable address".to_owned()
+    } else {
+        ips.iter().map(describe).collect::<Vec<_>>().join(", ")
+    };
+    if let Ok(ip) = external.parse::<std::net::IpAddr>() {
+        if !is_public_ip(&ip) {
+            msg.push_str(&format!(
+                "; the router's WAN address {} is not public (provider NAT): not reachable from the internet over IPv4",
+                ip
+            ));
+        }
+    }
+    if !ips.iter().any(|ip| ip.is_ipv6()) {
+        msg.push_str("; no global IPv6 address");
+    }
+    crate::ultra_diag::note("ADDR", format!("connection code addresses: {}", msg));
 }
 
 /// "internet" when the code holds a public address, "lan" when it works only inside the local
@@ -569,39 +637,82 @@ pub fn connection_code_scope(code: &str) -> &'static str {
 
 const CODE_CONNECT_TIMEOUT_MS: u64 = 15_000;
 
-/// Connects to the device a connection code names, trying all its addresses at once. The first
-/// address to finish the verified handshake wins; a key mismatch is reported over other errors.
+/// Connects to the device a connection code names, trying all its addresses at once.
 pub async fn connect_code(
     peer: &str,
     addrs: Vec<std::net::SocketAddr>,
     key: [u8; CODE_KEY_HASH_LEN],
 ) -> ResultType<(Stream, Vec<u8>, &'static str)> {
+    crate::ultra_diag::note("CODE", format!("{} address(es) in the code: {}", addrs.len(), list(&addrs)));
+    connect_many(peer, addrs, Some(key)).await
+}
+
+/// Connects to a typed address or host name. A name is resolved to all its IPv6 and IPv4
+/// addresses, and they are tried at once, like the addresses of a connection code.
+pub async fn connect_host(peer: &str, target: &str) -> ResultType<(Stream, Vec<u8>, &'static str)> {
+    let t = std::time::Instant::now();
+    let mut addrs: Vec<std::net::SocketAddr> = match hbb_common::tokio::net::lookup_host(target).await {
+        Ok(it) => it.collect(),
+        Err(e) => {
+            crate::ultra_diag::note("DNS", format!("{}: cannot resolve: {}", target, e));
+            bail!("Cannot resolve {}: {}", target, e);
+        }
+    };
+    addrs.dedup();
+    crate::ultra_diag::note(
+        "DNS",
+        format!("{} -> {} ({} ms)", target, list(&addrs), crate::ultra_diag::ms(t)),
+    );
+    connect_many(peer, addrs, None).await
+}
+
+fn list(addrs: &[std::net::SocketAddr]) -> String {
+    addrs.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ")
+}
+
+/// Typed names without a port ("myhost.example.com") are hosts too, on the default direct port.
+pub fn is_bare_host(peer: &str) -> bool {
+    let p = peer.trim();
+    p.contains('.')
+        && !p.contains(':')
+        && p.chars().any(|c| c.is_ascii_alphabetic())
+        && p.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+        && decode_connection_code(p).is_none()
+}
+
+/// Tries every address at once (each one QUIC and TCP raced); the first to finish the verified
+/// handshake wins. A key mismatch is reported over other errors, and nothing waits forever.
+async fn connect_many(
+    peer: &str,
+    addrs: Vec<std::net::SocketAddr>,
+    key: Option<[u8; CODE_KEY_HASH_LEN]>,
+) -> ResultType<(Stream, Vec<u8>, &'static str)> {
     use hbb_common::futures::stream::{FuturesUnordered, StreamExt};
+    let started = std::time::Instant::now();
     let mut tries: FuturesUnordered<_> = addrs
         .iter()
         .map(|a| {
             let target = a.to_string();
             async move {
-                let r = connect_direct(peer, None, Some(key), target.clone()).await;
+                let r = connect_direct(peer, None, key, target.clone()).await;
                 (target, r)
             }
         })
         .collect();
-    let mut errors = Vec::new();
     let mut security = None;
     let run = async {
         while let Some((target, r)) = tries.next().await {
             match r {
                 Ok(x) => {
-                    log::info!("Connection code: connected via {} over {}", target, x.2);
+                    crate::ultra_diag::note(
+                        "OK",
+                        format!("connected to {} over {} in {} ms", target, x.2, crate::ultra_diag::ms(started)),
+                    );
                     return Some(x);
                 }
                 Err(e) => {
-                    log::info!("Connection code: {} failed: {}", target, e);
                     if e.to_string().starts_with("SECURITY") {
                         security = Some(e);
-                    } else {
-                        errors.push(format!("{}: {}", target, e));
                     }
                 }
             }
@@ -611,10 +722,20 @@ pub async fn connect_code(
     let res = timeout(CODE_CONNECT_TIMEOUT_MS, run).await;
     match res {
         Ok(Some(x)) => Ok(x),
-        _ => match security {
+        Ok(None) => match security {
             Some(e) => Err(e),
             None => {
-                log::warn!("Connection code: no address answered: {:?}", errors);
+                crate::ultra_diag::note("FAIL", "no address answered; see the lines above for why");
+                bail!("ultra-unreachable-tip")
+            }
+        },
+        Err(_) => match security {
+            Some(e) => Err(e),
+            None => {
+                crate::ultra_diag::note(
+                    "FAIL",
+                    format!("gave up after {} s: no address finished the handshake", CODE_CONNECT_TIMEOUT_MS / 1000),
+                );
                 bail!("ultra-unreachable-tip")
             }
         },

@@ -1759,11 +1759,13 @@ impl<T: InvokeUiSession> Remote<T> {
                     .union
                 {
                     Some(login_response::Union::Error(err)) => {
+                        crate::ultra_diag::note("LOGIN", format!("the remote device answered: {}", err));
                         if !self.handler.handle_login_error(&err) {
                             return false;
                         }
                     }
                     Some(login_response::Union::PeerInfo(pi)) => {
+                        crate::ultra_diag::note("LOGIN", "logged in, the session is starting");
                         let peer_version = pi.version.clone();
                         let peer_platform = pi.platform.clone();
                         self.set_peer_info(&pi);

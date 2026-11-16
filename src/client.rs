@@ -439,15 +439,19 @@ impl Client {
         // to-do: remember the port for each peer, so that we can retry easier
         // Ultra RustDesk: direct connections are always end-to-end encrypted, with the peer key
         // pinned on first use (see ultra_pin.rs). They never fall back to plaintext.
-        if hbb_common::is_ip_str(peer) || hbb_common::is_domain_port_str(peer) {
+        if hbb_common::is_ip_str(peer)
+            || hbb_common::is_domain_port_str(peer)
+            || crate::ultra_pin::is_bare_host(peer)
+        {
             let target = if hbb_common::is_ip_str(peer) {
                 check_port(peer, RELAY_PORT + 1)
-            } else {
+            } else if hbb_common::is_domain_port_str(peer) {
                 peer.to_owned()
+            } else {
+                format!("{}:{}", peer.trim(), RELAY_PORT + 1)
             };
-            // QUIC and TCP are raced; the first to finish the encrypted handshake wins.
-            let (conn, pk, transport) =
-                crate::ultra_pin::connect_direct(peer, None, None, target).await?;
+            // Every address (IPv6 and IPv4) at once, each with QUIC and TCP raced.
+            let (conn, pk, transport) = crate::ultra_pin::connect_host(peer, &target).await?;
             return Ok((
                 (conn, true, Some(pk), None, transport),
                 (0, "".to_owned()),
@@ -474,6 +478,7 @@ impl Client {
         // Ultra RustDesk: serverless, so an ID that is not on the LAN cannot be reached. Say so
         // at once instead of waiting on servers that are never contacted.
         if !Config::ultra_has_own_server() && interface.get_lch().read().unwrap().other_server.is_none() {
+            crate::ultra_diag::note("ID", format!("{}: not found on the LAN, and no servers are used", peer));
             bail!("ultra-no-server-tip");
         }
 

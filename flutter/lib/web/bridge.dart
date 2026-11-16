@@ -1110,6 +1110,14 @@ class RustdeskImpl {
     return '';
   }
 
+  Future<String> mainUltraDiagLog({dynamic hint}) {
+    return Future.value('');
+  }
+
+  Future<void> mainUltraDiagClear({dynamic hint}) {
+    return Future.value();
+  }
+
   Future<bool> mainUltraForgetPin({required String id, dynamic hint}) {
     return Future.value(false);
   }

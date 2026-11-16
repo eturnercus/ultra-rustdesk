@@ -4,6 +4,7 @@ import 'package:flutter_hbb/mobile/pages/settings_page.dart';
 import 'package:flutter_hbb/web/settings_page.dart';
 import 'package:get/get.dart';
 import '../../common.dart';
+import '../../common/widgets/ultra_diag.dart';
 import '../../consts.dart';
 import '../../common/widgets/chat_page.dart';
 import '../../models/platform_model.dart';
@@ -51,7 +52,14 @@ class HomePageState extends State<HomePage> {
     if (!bind.isIncomingOnly()) {
       _pages.add(ConnectionPage(
         // Ultra RustDesk: scan another device's connection code to connect.
-        appBarActions: [ScanButton()],
+        appBarActions: [
+          IconButton(
+            tooltip: translate('Connection log'),
+            icon: const Icon(Icons.terminal),
+            onPressed: () => showUltraDiag(gFFI.dialogManager),
+          ),
+          ScanButton(),
+        ],
       ));
     }
     if (isAndroid && !bind.isOutgoingOnly()) {

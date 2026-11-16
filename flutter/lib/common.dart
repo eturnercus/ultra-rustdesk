@@ -30,6 +30,7 @@ import 'package:window_size/window_size.dart' as window_size;
 
 import '../consts.dart';
 import 'common/widgets/overlay.dart';
+import 'common/widgets/ultra_diag.dart';
 import 'mobile/pages/file_manager_page.dart';
 import 'mobile/pages/remote_page.dart';
 import 'mobile/pages/view_camera_page.dart';
@@ -1295,6 +1296,12 @@ void msgBox(SessionID sessionId, String type, String title, String text,
               : null,
         ));
     buttons.insert(0, button);
+  }
+  if (type.contains('error') && !isWeb) {
+    buttons.insert(
+        0,
+        dialogButton('Connection log',
+            isOutline: true, onPressed: () => showUltraDiag(dialogManager)));
   }
   if (link.isNotEmpty) {
     buttons.insert(0, dialogButton('JumpLink', onPressed: jumplink));

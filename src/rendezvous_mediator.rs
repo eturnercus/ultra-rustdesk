@@ -1411,20 +1411,23 @@ async fn direct_server(server: ServerPtr) {
                         "Direct server listening on: {:?}",
                         listener.as_ref().map(|l| l.local_addr())
                     );
+                    crate::ultra_diag::note("LISTEN", format!("TCP port {} open (IPv4 and IPv6)", port));
                     crate::ultra_upnp::keep_mapped(port as u16, ultra_wanted_direct_port);
                     quic = match hbb_common::quic::Listener::bind(port as u16) {
                         Ok(q) => {
                             log::info!("Direct QUIC listening on: {:?}", q.local_addr());
+                            crate::ultra_diag::note("LISTEN", format!("QUIC (UDP) port {} open, {}", port, q.families()));
                             Some(q)
                         }
                         Err(err) => {
                             log::warn!("Failed to start direct QUIC on UDP {}: {}", port, err);
+                            crate::ultra_diag::note("LISTEN", format!("QUIC (UDP) port {} NOT open: {}", port, err));
                             None
                         }
                     };
                 }
                 Err(err) => {
-                    // to-do: pass to ui
+                    crate::ultra_diag::note("LISTEN", format!("TCP port {} NOT open: {} (another program uses it?)", port, err));
                     log::error!(
                         "Failed to start direct server on port: {}, error: {}",
                         port,
@@ -1457,18 +1460,20 @@ async fn direct_server(server: ServerPtr) {
                 res = tcp_accept => Some(res),
                 Some((stream, addr)) = quic_accept => {
                     log::info!("direct QUIC access from {}", addr);
+                    crate::ultra_diag::note("IN", format!("{}: incoming over QUIC", addr));
                     let server = server.clone();
                     tokio::spawn(async move {
-                        allow_err!(
-                            crate::server::create_tcp_connection(
-                                server,
-                                hbb_common::Stream::Tcp(stream),
-                                addr,
-                                true,
-                                ConnectionMeta::default(),
-                            )
-                            .await
-                        );
+                        if let Err(e) = crate::server::create_tcp_connection(
+                            server,
+                            hbb_common::Stream::Tcp(stream),
+                            addr,
+                            true,
+                            ConnectionMeta::default(),
+                        )
+                        .await
+                        {
+                            crate::ultra_diag::note("IN", format!("{}: dropped: {}", addr, e));
+                        }
                     });
                     None
                 }
@@ -1479,22 +1484,24 @@ async fn direct_server(server: ServerPtr) {
             if let Ok(Ok((stream, addr))) = accepted {
                 stream.set_nodelay(true).ok();
                 log::info!("direct access from {}", addr);
+                crate::ultra_diag::note("IN", format!("{}: incoming over TCP", addr));
                 let local_addr = stream
                     .local_addr()
                     .unwrap_or(Config::get_any_listen_addr(true));
                 let server = server.clone();
                 tokio::spawn(async move {
-                    allow_err!(
-                        crate::server::create_tcp_connection(
-                            server,
-                            hbb_common::Stream::from(stream, local_addr),
-                            addr,
-                            // Ultra RustDesk: direct connections are end-to-end encrypted too.
-                            true,
-                            ConnectionMeta::default(), // Direct connections don't have server-side user context.
-                        )
-                        .await
-                    );
+                    if let Err(e) = crate::server::create_tcp_connection(
+                        server,
+                        hbb_common::Stream::from(stream, local_addr),
+                        addr,
+                        // Ultra RustDesk: direct connections are end-to-end encrypted too.
+                        true,
+                        ConnectionMeta::default(), // Direct connections don't have server-side user context.
+                    )
+                    .await
+                    {
+                        crate::ultra_diag::note("IN", format!("{}: dropped: {}", addr, e));
+                    }
                 });
             } else {
                 sleep(0.1).await;

@@ -1885,6 +1885,15 @@ pub fn main_ultra_code_scope(code: String) -> SyncReturn<String> {
     SyncReturn(crate::ultra_pin::connection_code_scope(&code).to_owned())
 }
 
+/// Ultra RustDesk: the live connection journal (listening side and outgoing attempts).
+pub fn main_ultra_diag_log() -> String {
+    crate::ultra_diag::full_journal()
+}
+
+pub fn main_ultra_diag_clear() {
+    crate::ultra_diag::clear_all()
+}
+
 /// Ultra RustDesk: forgets the key pinned for a peer (by address or by LAN ID). True if one was.
 pub fn main_ultra_forget_pin(id: String) -> bool {
     crate::ultra_pin::forget(&id)

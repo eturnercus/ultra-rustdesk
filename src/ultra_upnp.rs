@@ -51,27 +51,26 @@ pub fn keep_mapped(port: u16, still_wanted: fn() -> u16) {
                     gateway = match Gateway::discover() {
                         Ok(g) => Some(g),
                         Err(e) => {
-                            log::info!("UPnP: no gateway found: {}", e);
+                            crate::ultra_diag::note("UPNP", format!("no router answered ({}): forward port {} TCP+UDP by hand for access from the internet", e, port));
                             None
                         }
                     };
                 }
                 if let Some(g) = gateway.as_ref() {
+                    g.open_v6(port);
                     match g.map(port) {
                         Ok(()) => match g.external_ip() {
                             Ok(ip) => {
-                                log::info!(
-                                    "UPnP: port {} (TCP+UDP) forwarded, reachable at {}:{}",
-                                    port,
-                                    ip,
-                                    port
+                                crate::ultra_diag::note(
+                                    "UPNP",
+                                    format!("port {} (TCP+UDP) forwarded, router WAN address {}", port, ip),
                                 );
                                 set_external_ip(&ip);
                             }
-                            Err(_) => log::info!("UPnP: port {} (TCP+UDP) forwarded", port),
+                            Err(_) => crate::ultra_diag::note("UPNP", format!("port {} (TCP+UDP) forwarded", port)),
                         },
                         Err(e) => {
-                            log::info!("UPnP: mapping port {} failed: {}", port, e);
+                            crate::ultra_diag::note("UPNP", format!("forwarding port {} failed: {}", port, e));
                             gateway = None;
                         }
                     }
@@ -107,6 +106,24 @@ struct Gateway {
     control_path: String,
     service_type: String,
     local_ip: Ipv4Addr,
+    /// Control path of the router's IPv6 firewall service (IGDv2), when it has one.
+    v6_firewall: Option<String>,
+}
+
+const V6_FIREWALL: &str = "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1";
+
+fn control_path_of(body: &str, service_type: &str) -> Option<String> {
+    let at = body.find(&format!("<serviceType>{}</serviceType>", service_type))?;
+    let rest = &body[at..];
+    let end = rest.find("</service>").unwrap_or(rest.len());
+    let control = between(&rest[..end], "<controlURL>", "</controlURL>")?;
+    Some(if control.starts_with("http://") {
+        split_url(control).ok()?.1
+    } else if control.starts_with('/') {
+        control.to_owned()
+    } else {
+        format!("/{}", control)
+    })
 }
 
 impl Gateway {
@@ -166,6 +183,7 @@ impl Gateway {
                 control_path,
                 service_type: st.to_owned(),
                 local_ip,
+                v6_firewall: control_path_of(&body, V6_FIREWALL),
             });
         }
         bail!("no WAN connection service in the device description")
@@ -203,6 +221,55 @@ impl Gateway {
             self.soap("AddPortMapping", &args)?;
         }
         Ok(())
+    }
+
+    /// Asks the router to let incoming IPv6 to this device's global address and `port` through
+    /// its firewall (TCP and UDP). Most routers block incoming IPv6 by default.
+    fn open_v6(&self, port: u16) {
+        let Some(ip) = crate::ultra_pin::my_global_ipv6() else {
+            return;
+        };
+        let Some(path) = self.v6_firewall.as_deref() else {
+            crate::ultra_diag::note(
+                "UPNP",
+                format!("the router has no IPv6 firewall control: if IPv6 connections fail, allow incoming port {} to {} in its IPv6 firewall", port, ip),
+            );
+            return;
+        };
+        for (name, proto) in [("TCP", 6), ("UDP", 17)] {
+            let args = format!(
+                "<RemoteHost></RemoteHost><RemotePort>0</RemotePort><InternalClient>{ip}</InternalClient><InternalPort>{port}</InternalPort><Protocol>{proto}</Protocol><LeaseTime>{lease}</LeaseTime>",
+                ip = ip,
+                port = port,
+                proto = proto,
+                lease = LEASE_SECS
+            );
+            let body = format!(
+                "<?xml version=\"1.0\"?>\r\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:AddPinhole xmlns:u=\"{st}\">{args}</u:AddPinhole></s:Body></s:Envelope>",
+                st = V6_FIREWALL,
+                args = args
+            );
+            let soap_action = format!("\"{}#AddPinhole\"", V6_FIREWALL);
+            match http(
+                self.host,
+                "POST",
+                path,
+                &[
+                    ("Content-Type", "text/xml; charset=\"utf-8\""),
+                    ("SOAPAction", &soap_action),
+                ],
+                &body,
+            ) {
+                Ok(_) => crate::ultra_diag::note(
+                    "UPNP",
+                    format!("IPv6 firewall opened: {} [{}]:{}", name, ip, port),
+                ),
+                Err(e) => crate::ultra_diag::note(
+                    "UPNP",
+                    format!("the router refused to open IPv6 {} [{}]:{}: {}", name, ip, port, e),
+                ),
+            }
+        }
     }
 
     fn unmap(&self, port: u16) {

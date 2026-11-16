@@ -1,5 +1,5 @@
 // Ultra RustDesk icon generator: renders the icon (a monitor with a lightning bolt on a
-// violet-to-blue tile) into every PNG/ICO the platforms need. No dependencies: plain Node.
+// dark red tile) into every PNG/ICO the platforms need. No dependencies: plain Node.
 //   node res/gen_ultra_icons.js
 'use strict';
 const fs = require('fs');
@@ -7,8 +7,8 @@ const path = require('path');
 const zlib = require('zlib');
 
 const ROOT = path.resolve(__dirname, '..');
-const C1 = [123, 47, 247]; // #7b2ff7, top left
-const C2 = [31, 162, 255]; // #1fa2ff, bottom right
+const C1 = [200, 30, 45]; // #c81e2d, top left
+const C2 = [74, 4, 12]; // #4a040c, bottom right
 
 // Geometry in a 1024 x 1024 design space.
 const TILE_R = 224;

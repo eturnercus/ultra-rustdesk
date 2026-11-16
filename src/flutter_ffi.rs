@@ -1880,6 +1880,11 @@ pub fn main_ultra_connection_code() -> String {
     crate::ui_interface::get_ultra_connection_code()
 }
 
+/// Ultra RustDesk: "internet", "lan" or "" (not a code): where a connection code works.
+pub fn main_ultra_code_scope(code: String) -> SyncReturn<String> {
+    SyncReturn(crate::ultra_pin::connection_code_scope(&code).to_owned())
+}
+
 /// Ultra RustDesk: forgets the key pinned for a peer (by address or by LAN ID). True if one was.
 pub fn main_ultra_forget_pin(id: String) -> bool {
     crate::ultra_pin::forget(&id)

@@ -313,6 +313,17 @@ impl RendezvousMediator {
         scrap::codec::test_av1();
         *LAST_NOT_DEPLOYED_REGISTER.lock().await = None;
         loop {
+            // Ultra RustDesk: serverless unless the user set an ID server. Ready at once, and
+            // the public servers are never contacted.
+            if !Config::ultra_has_own_server() {
+                Config::reset_online();
+                if !config::option2bool("stop-service", &Config::get_option("stop-service")) {
+                    Config::ultra_set_serverless_online();
+                }
+                let restarted = MANUAL_RESTART_NOTIFY.notified();
+                wait_for_retry(3., restarted).await;
+                continue;
+            }
             let timeout = Arc::new(RwLock::new(CONNECT_TIMEOUT));
             let conn_start_time = Instant::now();
             *SOLVING_PK_MISMATCH.lock().await = "".to_owned();

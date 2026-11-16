@@ -693,6 +693,10 @@ impl Drop for CheckTestNatType {
 }
 
 pub fn test_nat_type() {
+    // Ultra RustDesk: serverless mode has no server to test against.
+    if !Config::ultra_has_own_server() {
+        return;
+    }
     test_ipv6_sync();
     use std::sync::atomic::{AtomicBool, Ordering};
     std::thread::spawn(move || {
@@ -870,6 +874,9 @@ async fn test_rendezvous_server_() {
 }
 
 pub fn test_rendezvous_server() {
+    if !Config::ultra_has_own_server() {
+        return;
+    }
     std::thread::spawn(test_rendezvous_server_);
 }
 
@@ -2451,6 +2458,10 @@ pub fn create_symmetric_key_msg(their_pk_b: [u8; 32]) -> (Bytes, Bytes, secretbo
 
 #[inline]
 pub fn using_public_server() -> bool {
+    // Ultra RustDesk: serverless mode uses no server at all, public or not.
+    if !Config::ultra_has_own_server() {
+        return false;
+    }
     crate::get_custom_rendezvous_server(get_option("custom-rendezvous-server")).is_empty()
 }
 

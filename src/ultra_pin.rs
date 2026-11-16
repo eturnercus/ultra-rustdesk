@@ -413,9 +413,10 @@ fn b32_decode(s: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-pub fn encode_connection_code(addr: std::net::SocketAddr, pk: &[u8]) -> String {
-    let mut data = Vec::new();
-    match addr.ip() {
+const CODE_MULTI: u8 = 2;
+
+fn push_ip(data: &mut Vec<u8>, ip: &std::net::IpAddr) {
+    match ip {
         std::net::IpAddr::V4(ip) => {
             data.push(4);
             data.extend_from_slice(&ip.octets());
@@ -425,61 +426,198 @@ pub fn encode_connection_code(addr: std::net::SocketAddr, pk: &[u8]) -> String {
             data.extend_from_slice(&ip.octets());
         }
     }
-    data.extend_from_slice(&addr.port().to_be_bytes());
+}
+
+/// A code naming every address the device can be reached at (LAN, public IPv4, IPv6), the
+/// direct port and the key hash. The controller tries all addresses at once.
+pub fn encode_connection_code(ips: &[std::net::IpAddr], port: u16, pk: &[u8]) -> String {
+    let mut data = Vec::new();
+    if ips.len() == 1 {
+        push_ip(&mut data, &ips[0]);
+    } else {
+        data.push(CODE_MULTI);
+        data.push(ips.len() as u8);
+        for ip in ips {
+            push_ip(&mut data, ip);
+        }
+    }
+    data.extend_from_slice(&port.to_be_bytes());
     data.extend_from_slice(&key_hash(pk));
     format!("{}{}", CODE_PREFIX, b32_encode(&data))
 }
 
-/// The address and key hash in a connection code; `None` if `code` is not one.
-pub fn decode_connection_code(code: &str) -> Option<(std::net::SocketAddr, [u8; CODE_KEY_HASH_LEN])> {
+fn take_ip(data: &[u8]) -> Option<(std::net::IpAddr, usize)> {
+    match data.first()? {
+        4 if data.len() >= 5 => Some((<[u8; 4]>::try_from(&data[1..5]).ok()?.into(), 5)),
+        6 if data.len() >= 17 => Some((<[u8; 16]>::try_from(&data[1..17]).ok()?.into(), 17)),
+        _ => None,
+    }
+}
+
+/// The addresses and key hash in a connection code; `None` if `code` is not one.
+pub fn decode_connection_code(
+    code: &str,
+) -> Option<(Vec<std::net::SocketAddr>, [u8; CODE_KEY_HASH_LEN])> {
     let code: String = code.chars().filter(|c| !c.is_whitespace() && *c != '-').collect();
-    if !code.is_ascii() || code.len() < CODE_PREFIX.len() || !code[..CODE_PREFIX.len()].eq_ignore_ascii_case(CODE_PREFIX) {
+    if !code.is_ascii()
+        || code.len() < CODE_PREFIX.len()
+        || !code[..CODE_PREFIX.len()].eq_ignore_ascii_case(CODE_PREFIX)
+    {
         return None;
     }
     let data = b32_decode(&code[CODE_PREFIX.len()..])?;
-    let ip_len = match data.first()? {
-        4 => 4,
-        6 => 16,
-        _ => return None,
-    };
-    if data.len() != 1 + ip_len + 2 + CODE_KEY_HASH_LEN {
+    let mut ips = Vec::new();
+    let mut at = 0;
+    if *data.first()? == CODE_MULTI {
+        let n = *data.get(1)? as usize;
+        at = 2;
+        for _ in 0..n {
+            let (ip, len) = take_ip(data.get(at..)?)?;
+            ips.push(ip);
+            at += len;
+        }
+    } else {
+        let (ip, len) = take_ip(&data)?;
+        ips.push(ip);
+        at += len;
+    }
+    if ips.is_empty() || data.len() != at + 2 + CODE_KEY_HASH_LEN {
         return None;
     }
-    let ip: std::net::IpAddr = if ip_len == 4 {
-        <[u8; 4]>::try_from(&data[1..5]).ok()?.into()
-    } else {
-        <[u8; 16]>::try_from(&data[1..17]).ok()?.into()
-    };
-    let port = u16::from_be_bytes([data[1 + ip_len], data[2 + ip_len]]);
+    let port = u16::from_be_bytes([data[at], data[at + 1]]);
     let mut hash = [0u8; CODE_KEY_HASH_LEN];
-    hash.copy_from_slice(&data[3 + ip_len..]);
-    Some((std::net::SocketAddr::new(ip, port), hash))
+    hash.copy_from_slice(&data[at + 2..]);
+    Some((
+        ips.into_iter()
+            .map(|ip| std::net::SocketAddr::new(ip, port))
+            .collect(),
+        hash,
+    ))
 }
 
-/// This device's connection code: the router's external address when UPnP reported one,
-/// otherwise the LAN address (then the code only works inside this network). Empty when direct
-/// access is off.
+/// Reachable from the internet: not private, carrier-grade NAT, loopback or link-local.
+pub fn is_public_ip(ip: &std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            let o = v4.octets();
+            !(v4.is_private()
+                || v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || (o[0] == 100 && (o[1] & 0xc0) == 64))
+        }
+        std::net::IpAddr::V6(v6) => (v6.segments()[0] & 0xe000) == 0x2000,
+    }
+}
+
+/// The local address the OS would use towards `probe`; no packet is sent.
+#[cfg(not(target_os = "ios"))]
+fn outgoing_ip(bind: &str, probe: &str) -> Option<std::net::IpAddr> {
+    let s = std::net::UdpSocket::bind(bind).ok()?;
+    s.connect(probe).ok()?;
+    Some(s.local_addr().ok()?.ip())
+}
+
+/// Every address this device can be reached at: its LAN IPv4 (works inside this network), the
+/// router's public IPv4 from UPnP (only when it really is public, not carrier-grade NAT) and a
+/// global IPv6 address (often reachable even without a public IPv4).
+#[cfg(not(target_os = "ios"))]
+pub fn my_addresses() -> Vec<std::net::IpAddr> {
+    let mut ips = Vec::new();
+    if let Some(ip) = outgoing_ip("0.0.0.0:0", "8.8.8.8:80") {
+        if !ip.is_unspecified() && !ip.is_loopback() {
+            ips.push(ip);
+        }
+    }
+    if let Ok(ip) = Config::get_option(OPTION_EXTERNAL_IP).parse::<std::net::IpAddr>() {
+        if is_public_ip(&ip) && !ips.contains(&ip) {
+            ips.push(ip);
+        }
+    }
+    if let Some(ip) = outgoing_ip("[::]:0", "[2001:4860:4860::8888]:80") {
+        if is_public_ip(&ip) {
+            ips.push(ip);
+        }
+    }
+    ips
+}
+
+/// This device's connection code. Empty when direct access is off.
 #[cfg(not(target_os = "ios"))]
 pub fn my_connection_code() -> String {
     if crate::rendezvous_mediator::ultra_direct_advert().is_empty() {
         return String::new();
     }
+    let ips = my_addresses();
+    if ips.is_empty() {
+        return String::new();
+    }
     let port = crate::rendezvous_mediator::get_direct_port() as u16;
-    let ip = Config::get_option(OPTION_EXTERNAL_IP)
-        .parse::<std::net::IpAddr>()
-        .ok()
-        .or_else(|| {
-            let s = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
-            // No packet is sent: connecting a UDP socket only picks the outgoing interface.
-            s.connect("8.8.8.8:80").ok()?;
-            Some(s.local_addr().ok()?.ip())
-        });
-    match ip {
-        Some(ip) => encode_connection_code(
-            std::net::SocketAddr::new(ip, port),
-            &Config::get_key_pair().1,
-        ),
-        None => String::new(),
+    encode_connection_code(&ips, port, &Config::get_key_pair().1)
+}
+
+/// "internet" when the code holds a public address, "lan" when it works only inside the local
+/// network, "" when `code` is not a connection code.
+pub fn connection_code_scope(code: &str) -> &'static str {
+    match decode_connection_code(code) {
+        Some((addrs, _)) if addrs.iter().any(|a| is_public_ip(&a.ip())) => "internet",
+        Some(_) => "lan",
+        None => "",
+    }
+}
+
+const CODE_CONNECT_TIMEOUT_MS: u64 = 15_000;
+
+/// Connects to the device a connection code names, trying all its addresses at once. The first
+/// address to finish the verified handshake wins; a key mismatch is reported over other errors.
+pub async fn connect_code(
+    peer: &str,
+    addrs: Vec<std::net::SocketAddr>,
+    key: [u8; CODE_KEY_HASH_LEN],
+) -> ResultType<(Stream, Vec<u8>, &'static str)> {
+    use hbb_common::futures::stream::{FuturesUnordered, StreamExt};
+    let mut tries: FuturesUnordered<_> = addrs
+        .iter()
+        .map(|a| {
+            let target = a.to_string();
+            async move {
+                let r = connect_direct(peer, None, Some(key), target.clone()).await;
+                (target, r)
+            }
+        })
+        .collect();
+    let mut errors = Vec::new();
+    let mut security = None;
+    let run = async {
+        while let Some((target, r)) = tries.next().await {
+            match r {
+                Ok(x) => {
+                    log::info!("Connection code: connected via {} over {}", target, x.2);
+                    return Some(x);
+                }
+                Err(e) => {
+                    log::info!("Connection code: {} failed: {}", target, e);
+                    if e.to_string().starts_with("SECURITY") {
+                        security = Some(e);
+                    } else {
+                        errors.push(format!("{}: {}", target, e));
+                    }
+                }
+            }
+        }
+        None
+    };
+    let res = timeout(CODE_CONNECT_TIMEOUT_MS, run).await;
+    match res {
+        Ok(Some(x)) => Ok(x),
+        _ => match security {
+            Some(e) => Err(e),
+            None => {
+                log::warn!("Connection code: no address answered: {:?}", errors);
+                bail!("ultra-unreachable-tip")
+            }
+        },
     }
 }
 
@@ -495,12 +633,22 @@ mod tests {
 
     #[test]
     fn connection_code_round_trip() {
-        let addr: std::net::SocketAddr = "203.0.113.7:21118".parse().unwrap();
-        let code = encode_connection_code(addr, b"some signing key");
+        let ip: std::net::IpAddr = "203.0.113.7".parse().unwrap();
+        let code = encode_connection_code(&[ip], 21118, b"some signing key");
         assert!(code.starts_with("UR"));
         let (a, h) = decode_connection_code(&code.to_lowercase()).unwrap();
-        assert_eq!(a, addr);
+        assert_eq!(a, vec![std::net::SocketAddr::new(ip, 21118)]);
         assert_eq!(h, key_hash(b"some signing key"));
+        assert_eq!(connection_code_scope(&code), "internet");
+        let ips: Vec<std::net::IpAddr> =
+            vec!["192.168.1.5".parse().unwrap(), "2001:db8::7".parse().unwrap()];
+        let code = encode_connection_code(&ips, 9000, b"k");
+        let (a, _) = decode_connection_code(&code).unwrap();
+        assert_eq!(a.len(), 2);
+        assert_eq!(a[1], "[2001:db8::7]:9000".parse().unwrap());
+        assert_eq!(connection_code_scope(&encode_connection_code(&ips[..1], 1, b"k")), "lan");
+        assert!(!is_public_ip(&"100.72.1.1".parse().unwrap()));
+        assert!(is_public_ip(&"2a00:1450::1".parse().unwrap()));
         assert!(decode_connection_code("123456789").is_none());
         assert!(decode_connection_code("192.168.1.2").is_none());
     }

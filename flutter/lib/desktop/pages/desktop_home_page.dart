@@ -296,6 +296,20 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                 ?.withOpacity(0.5)),
                       ),
                       SelectableText(code, style: const TextStyle(fontSize: 13)),
+                      Text(
+                        translate(bind.mainUltraCodeScope(code: code) == 'lan'
+                            ? 'ultra-code-lan-tip'
+                            : 'ultra-code-internet-tip'),
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: bind.mainUltraCodeScope(code: code) == 'lan'
+                                ? Colors.orange
+                                : Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.color
+                                    ?.withOpacity(0.5)),
+                      ),
                     ],
                   ),
                 ),

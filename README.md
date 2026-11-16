@@ -36,7 +36,7 @@ Platforms: **Windows x64**, **Linux x86_64** (`.deb`, `.rpm`, Arch, AppImage), *
 | Transports for a direct connection | TCP | **QUIC and TCP raced in parallel** |
 | Direct access | off by default | on by default |
 | Default / maximum frame rate | 30 / 120 FPS (30 without your own server) | **60 / 144 FPS** |
-| Needs public RustDesk servers | for ID connections | no, for direct connections |
+| Servers | public RustDesk servers for every ID connection | **none**: never contacted unless you set your own ID server; ready at once |
 | LAN devices found by discovery | connected through a server | **connected directly**, no server |
 | Router port forwarding | manual | **automatic (UPnP)** |
 | Self-updates from rustdesk.com | yes | **disabled** (would replace the fork) |
@@ -104,9 +104,14 @@ Code: [`libs/hbb_common/src/quic.rs`](libs/hbb_common/src/quic.rs), `connect_dir
 
 1. On the PC: **Settings → Security → Set permanent password**.
 2. On the PC: open **Settings → About** and copy the **Connection code** (`UR…`). It contains the PC's
-   external address (from UPnP), the direct port and a hash of the PC's key.
+   addresses (LAN, public IPv4 from UPnP, global IPv6), the direct port and a hash of the PC's key.
+   Under the code the PC says whether it works from the internet or only inside this network.
 3. On the phone: type the code into the ID field, connect and enter the password. The key is checked
-   against the code, so no pairing dialog appears.
+   against the code, so no pairing dialog appears. All addresses are tried at once; if none answers
+   within 15 seconds you get an error saying so, not an endless wait.
+
+Typing a plain ID works only for devices on the **LAN** tab: no servers are used, so for anything else
+the app tells you at once to use the connection code or an IP address.
 
 The code changes when your provider gives the PC a new external address; copy it again then. Without
 UPnP the code holds the LAN address and works only inside that network. Behind carrier-grade NAT (no

@@ -1078,6 +1078,15 @@ impl Config {
         rendezvous_server
     }
 
+    /// Ultra RustDesk: whether the user set an ID server of their own. Without one the app works
+    /// serverless (direct connections only) and never contacts the public RustDesk servers,
+    /// which are blocked or slow in many networks and kept the app "connecting" forever.
+    pub fn ultra_has_own_server() -> bool {
+        !EXE_RENDEZVOUS_SERVER.read().unwrap().is_empty()
+            || !Self::get_option("custom-rendezvous-server").is_empty()
+            || !PROD_RENDEZVOUS_SERVER.read().unwrap().is_empty()
+    }
+
     pub fn get_rendezvous_servers() -> Vec<String> {
         let s = EXE_RENDEZVOUS_SERVER.read().unwrap().clone();
         if !s.is_empty() {
@@ -1103,6 +1112,11 @@ impl Config {
             }
         }
         return RENDEZVOUS_SERVERS.iter().map(|x| x.to_string()).collect();
+    }
+
+    /// Ultra RustDesk: serverless mode is "online" as soon as the direct listener is up.
+    pub fn ultra_set_serverless_online() {
+        ONLINE.lock().unwrap().insert("direct".to_owned(), 1);
     }
 
     pub fn reset_online() {

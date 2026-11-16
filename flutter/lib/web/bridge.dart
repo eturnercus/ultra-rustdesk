@@ -1106,6 +1106,10 @@ class RustdeskImpl {
     return Future.value('');
   }
 
+  String mainUltraCodeScope({required String code, dynamic hint}) {
+    return '';
+  }
+
   Future<bool> mainUltraForgetPin({required String id, dynamic hint}) {
     return Future.value(false);
   }

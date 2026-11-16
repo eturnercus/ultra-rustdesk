@@ -455,9 +455,8 @@ impl Client {
             ));
         }
         // Ultra RustDesk: a connection code ("UR...") names the address and the key directly.
-        if let Some((addr, key)) = crate::ultra_pin::decode_connection_code(peer) {
-            let (conn, pk, transport) =
-                crate::ultra_pin::connect_direct(peer, None, Some(key), addr.to_string()).await?;
+        if let Some((addrs, key)) = crate::ultra_pin::decode_connection_code(peer) {
+            let (conn, pk, transport) = crate::ultra_pin::connect_code(peer, addrs, key).await?;
             return Ok((
                 (conn, true, Some(pk), None, transport),
                 (0, "".to_owned()),
@@ -471,6 +470,11 @@ impl Client {
                 (0, "".to_owned()),
                 false,
             ));
+        }
+        // Ultra RustDesk: serverless, so an ID that is not on the LAN cannot be reached. Say so
+        // at once instead of waiting on servers that are never contacted.
+        if !Config::ultra_has_own_server() && interface.get_lch().read().unwrap().other_server.is_none() {
+            bail!("ultra-no-server-tip");
         }
 
         let other_server = interface.get_lch().read().unwrap().other_server.clone();

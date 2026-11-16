@@ -295,5 +295,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("ultra-pin-forgotten-tip", "The key is forgotten. The next connection pins a new one."),
         ("ultra-no-pin-tip", "No key is pinned for this device."),
         ("ultra-pair_tip", "First connection to this device. Compare the code below with the one on the remote device (Settings → About, the first 6 digits of the fingerprint). Continue only if they match. Code:"),
+        ("ultra-no-server-tip", "This is an ID, and no servers are used: Ultra RustDesk connects directly only. Enter the connection code (UR…) or the IP address of the remote device. The code is on its home screen and in Settings → About. Devices on the LAN tab can also be connected by ID."),
+        ("ultra-unreachable-tip", "The remote device did not answer at any address in the code. Check that Ultra RustDesk runs there and that the code is fresh (it changes with the address). From another network it works only if the PC has a public address or IPv6; the PC home screen says so under the code."),
+        ("ultra-code-lan-tip", "This code works only inside this local network: the PC has no public address (provider NAT, or a router without UPnP) and no IPv6."),
+        ("ultra-code-internet-tip", "The code works from the internet and inside the local network."),
     ].iter().cloned().collect();
 }

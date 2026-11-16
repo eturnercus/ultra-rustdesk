@@ -276,7 +276,9 @@ pub async fn connect_direct(
     expected_key: Option<[u8; CODE_KEY_HASH_LEN]>,
     target: String,
 ) -> ResultType<(Stream, Vec<u8>, &'static str)> {
-    use hbb_common::{config::CONNECT_TIMEOUT, futures::future::{select, Either}, quic, socket_client::connect_tcp_local};
+    use hbb_common::{futures::future::{select, Either}, quic, socket_client::connect_tcp_local};
+    // Below the 15 s overall cap, so each transport reports its own reason in the log.
+    const CONNECT_TIMEOUT: u64 = 10_000;
 
     let quic_inner = async {
         let addr = hbb_common::tokio::net::lookup_host(target.as_str())
@@ -564,8 +566,10 @@ pub fn my_addresses() -> Vec<std::net::IpAddr> {
             ips.push(ip);
         }
     }
+    // The router's WAN address goes in even when it is private: with a router behind another
+    // router (or an office network), devices in the outer network reach the PC through it.
     if let Ok(ip) = Config::get_option(OPTION_EXTERNAL_IP).parse::<std::net::IpAddr>() {
-        if is_public_ip(&ip) && !ips.contains(&ip) {
+        if !ip.is_unspecified() && !ip.is_loopback() && !ips.contains(&ip) {
             ips.push(ip);
         }
     }
@@ -600,12 +604,13 @@ fn note_addresses(ips: &[std::net::IpAddr]) {
         return;
     }
     *last = Some(ips.to_vec());
+    let external = Config::get_option(OPTION_EXTERNAL_IP);
     let describe = |ip: &std::net::IpAddr| match ip {
         std::net::IpAddr::V6(_) => format!("{} (IPv6, internet)", ip),
         _ if is_public_ip(ip) => format!("{} (public IPv4, internet)", ip),
+        _ if ip.to_string() == external => format!("{} (router WAN, its outer network only)", ip),
         _ => format!("{} (LAN only)", ip),
     };
-    let external = Config::get_option(OPTION_EXTERNAL_IP);
     let mut msg = if ips.is_empty() {
         "no usable address".to_owned()
     } else {
@@ -680,6 +685,36 @@ pub fn is_bare_host(peer: &str) -> bool {
         && decode_connection_code(p).is_none()
 }
 
+/// When every address is a private one outside this device's own network, says so: that is
+/// the usual reason for a timeout (the code was made in another network).
+fn note_other_network(addrs: &[std::net::SocketAddr]) {
+    #[cfg(not(target_os = "ios"))]
+    {
+        if addrs.is_empty() || addrs.iter().any(|a| is_public_ip(&a.ip())) {
+            return;
+        }
+        let Some(std::net::IpAddr::V4(mine)) = outgoing_ip("0.0.0.0:0", "8.8.8.8:80") else {
+            return;
+        };
+        let same_net = addrs.iter().any(|a| match a.ip() {
+            std::net::IpAddr::V4(t) => t.octets()[..3] == mine.octets()[..3],
+            _ => false,
+        });
+        if !same_net {
+            crate::ultra_diag::note(
+                "HINT",
+                format!(
+                    "the code has only private addresses ({}), and this device is in another network ({}): \
+                     they cannot reach each other. Connect both to the same network, or give the PC a public \
+                     address or IPv6 (UPnP or port forwarding of 21118 TCP+UDP on its router)",
+                    list(addrs),
+                    mine
+                ),
+            );
+        }
+    }
+}
+
 /// Tries every address at once (each one QUIC and TCP raced); the first to finish the verified
 /// handshake wins. A key mismatch is reported over other errors, and nothing waits forever.
 async fn connect_many(
@@ -726,6 +761,7 @@ async fn connect_many(
             Some(e) => Err(e),
             None => {
                 crate::ultra_diag::note("FAIL", "no address answered; see the lines above for why");
+                note_other_network(&addrs);
                 bail!("ultra-unreachable-tip")
             }
         },
@@ -736,6 +772,7 @@ async fn connect_many(
                     "FAIL",
                     format!("gave up after {} s: no address finished the handshake", CODE_CONNECT_TIMEOUT_MS / 1000),
                 );
+                note_other_network(&addrs);
                 bail!("ultra-unreachable-tip")
             }
         },

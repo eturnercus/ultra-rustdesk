@@ -31,6 +31,7 @@ import 'package:window_size/window_size.dart' as window_size;
 import '../consts.dart';
 import 'common/widgets/overlay.dart';
 import 'common/widgets/ultra_diag.dart';
+import 'common/widgets/ultra_tunnel.dart';
 import 'mobile/pages/file_manager_page.dart';
 import 'mobile/pages/remote_page.dart';
 import 'mobile/pages/view_camera_page.dart';
@@ -2630,6 +2631,10 @@ connect(BuildContext context, String id,
     } catch (_) {}
   }
   id = id.replaceAll(' ', '');
+  // Ultra RustDesk: an invite code first shows the answer code for the PC owner.
+  if (!isWeb && isUltraTunnelInvite(id) && !await ultraTunnelPrepare(id)) {
+    return;
+  }
   final oldId = id;
   id = await bind.mainHandleRelayId(id: id);
   forceRelay = id != oldId || forceRelay;

@@ -5,6 +5,7 @@ import 'package:flutter_hbb/web/settings_page.dart';
 import 'package:get/get.dart';
 import '../../common.dart';
 import '../../common/widgets/ultra_diag.dart';
+import '../../common/widgets/ultra_tunnel.dart';
 import '../../consts.dart';
 import '../../common/widgets/chat_page.dart';
 import '../../models/platform_model.dart';
@@ -53,6 +54,11 @@ class HomePageState extends State<HomePage> {
       _pages.add(ConnectionPage(
         // Ultra RustDesk: scan another device's connection code to connect.
         appBarActions: [
+          IconButton(
+            tooltip: translate('P2P tunnel'),
+            icon: const Icon(Icons.vpn_lock),
+            onPressed: () => showUltraTunnelHost(gFFI.dialogManager),
+          ),
           IconButton(
             tooltip: translate('Connection log'),
             icon: const Icon(Icons.terminal),

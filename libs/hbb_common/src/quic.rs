@@ -182,6 +182,44 @@ pub async fn connect(addr: SocketAddr, sni: &str, timeout_ms: u64) -> ResultType
     Ok(FramedStream::from(io, addr))
 }
 
+/// A client endpoint on a socket that already has a NAT mapping (P2P tunnel).
+pub fn client_endpoint_on(socket: std::net::UdpSocket) -> ResultType<Endpoint> {
+    socket.set_nonblocking(true)?;
+    let mut endpoint = Endpoint::new(
+        quinn::EndpointConfig::default(),
+        None,
+        socket,
+        Arc::new(quinn::TokioRuntime),
+    )?;
+    endpoint.set_default_client_config(client_config()?);
+    Ok(endpoint)
+}
+
+/// One connection attempt from `endpoint`; the stream keeps the endpoint alive.
+pub async fn connect_from(
+    endpoint: &Endpoint,
+    addr: SocketAddr,
+    timeout_ms: u64,
+) -> ResultType<FramedStream> {
+    let fut = async {
+        let conn = endpoint.connect(addr, DEFAULT_SNI)?.await?;
+        let (mut send, recv) = conn.open_bi().await?;
+        send.write_all(PREAMBLE).await?;
+        Ok::<_, anyhow::Error>((conn, send, recv))
+    };
+    let (conn, send, recv) = match crate::timeout(timeout_ms, fut).await {
+        Ok(res) => res?,
+        Err(_) => bail!("no answer in {} ms", timeout_ms),
+    };
+    let io = QuicIo {
+        recv,
+        send,
+        _conn: conn,
+        _endpoint: Some(endpoint.clone()),
+    };
+    Ok(FramedStream::from(io, addr))
+}
+
 // ---------------------------------------------------------------- server
 
 fn server_config() -> ResultType<quinn::ServerConfig> {
@@ -244,6 +282,44 @@ impl Listener {
                             }
                             Ok(Err(e)) => log::debug!("QUIC accept failed: {}", e),
                             Err(_) => log::debug!("QUIC accept timed out"),
+                        }
+                    });
+                }
+            });
+        }
+        Ok(Self {
+            endpoints,
+            rx: Mutex::new(rx),
+        })
+    }
+
+    /// A listener on sockets that already have NAT mappings (P2P tunnel).
+    pub fn on_sockets(sockets: Vec<std::net::UdpSocket>) -> ResultType<Self> {
+        let cfg = server_config()?;
+        let mut endpoints = Vec::new();
+        for socket in sockets {
+            socket.set_nonblocking(true)?;
+            endpoints.push(Endpoint::new(
+                quinn::EndpointConfig::default(),
+                Some(cfg.clone()),
+                socket,
+                Arc::new(quinn::TokioRuntime),
+            )?);
+        }
+        let (tx, rx) = mpsc::channel(4);
+        for endpoint in &endpoints {
+            let endpoint = endpoint.clone();
+            let tx = tx.clone();
+            tokio::spawn(async move {
+                while let Some(incoming) = endpoint.accept().await {
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        match crate::timeout(10_000, accept_one(incoming)).await {
+                            Ok(Ok(x)) => {
+                                tx.send(x).await.ok();
+                            }
+                            Ok(Err(e)) => log::debug!("QUIC tunnel accept failed: {}", e),
+                            Err(_) => log::debug!("QUIC tunnel accept timed out"),
                         }
                     });
                 }

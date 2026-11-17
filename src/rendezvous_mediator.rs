@@ -298,6 +298,8 @@ impl RendezvousMediator {
             crate::test_rendezvous_server();
         }
         let server_cloned = server.clone();
+        #[cfg(not(target_os = "ios"))]
+        crate::ultra_tunnel::set_server(server.clone());
         tokio::spawn(async move {
             direct_server(server_cloned).await;
         });

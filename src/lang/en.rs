@@ -299,6 +299,17 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("ultra-unreachable-tip", "The remote device did not answer at any address in the code. Check that Ultra RustDesk runs there and that the code is fresh (it changes with the address). From another network it works only if the PC has a public address or IPv6; the PC home screen says so under the code."),
         ("ultra-code-lan-tip", "This code works only inside this local network: the PC has no public address (provider NAT, or a router without UPnP) and no IPv6."),
         ("ultra-code-internet-tip", "The code works from the internet and inside the local network."),
+        ("ultra-tunnel-host-tip", "A direct encrypted tunnel between this device and another one over the internet, even when neither has a public IP. No servers: you swap the addresses yourselves. 1) Send the invite code to whoever will connect; they enter it instead of an ID. 2) They send back an answer code: paste it below and press Accept. Both devices then punch through their routers towards each other; it takes a few seconds, up to 3 minutes."),
+        ("ultra-tunnel-answer-tip", "Send this answer code to the PC owner (in a messenger): they paste it in the \"P2P tunnel\" window and press Accept. Press Connect now: the app waits up to 3 minutes for the tunnel to open."),
+        ("ultra-tunnel-preparing", "Finding out this device's external address…"),
+        ("ultra-tunnel-waiting", "Punching through the routers and waiting for the connection (up to 3 minutes)…"),
+        ("ultra-tunnel-bad-answer", "Not the right answer code: it starts with UA and is made for the invite code above"),
+        ("ultra-tunnel-closed", "The session through the tunnel has ended."),
+        ("ultra-tunnel-new-invite", "New invite code"),
+        ("ultra-tunnel-failed-tip", "The tunnel did not open in 3 minutes. Check that the PC owner pasted the answer code and pressed Accept. If they did, one of the networks does not allow punching through (usually mobile internet): try another network, such as home Wi-Fi. Details are in the connection log."),
+        ("ultra-tunnel-invite-copied", "Invite code copied: send it to whoever connects"),
+        ("ultra-tunnel-answer-copied", "Answer code copied: send it to the PC owner"),
+        ("ultra-tunnel-auto-tip", "Just copy the answer code you receive: it is pasted and accepted by itself"),
         ("ultra-diag-tip", "Every connection step, live. TRY: an attempt starts at an address; QUIC/TCP: how each transport ended and how long it took; DNS: addresses of a name; CODE: addresses in a code; LAN: local network; LISTEN: ports open on this device; UPNP: the router; IN: incoming connections; LOGIN: password login; ADDR: this device's addresses. \"timed out\" means packets do not get through (port closed, NAT or firewall), \"refused\" means nothing listens there, \"SECURITY\" means the key did not match."),
     ].iter().cloned().collect();
 }

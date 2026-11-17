@@ -11,6 +11,7 @@ post_install() {
 	systemctl daemon-reload
 	systemctl enable ultrarustdesk
 	systemctl start ultrarustdesk
+	gtk-update-icon-cache -f -t -q /usr/share/icons/hicolor >/dev/null 2>&1 || true
 	update-desktop-database
 }
 
@@ -29,6 +30,7 @@ post_upgrade() {
 	systemctl daemon-reload
 	systemctl enable ultrarustdesk
 	systemctl start ultrarustdesk
+	gtk-update-icon-cache -f -t -q /usr/share/icons/hicolor >/dev/null 2>&1 || true
 	update-desktop-database
 }
 

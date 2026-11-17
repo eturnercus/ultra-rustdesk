@@ -100,12 +100,36 @@ wins. Nothing waits forever: after 15 seconds you get an error, and the log says
 | **IPv4 address**, e.g. `192.168.1.20`, `203.0.113.7:21118` | that address | where it is reachable |
 | **IPv6 address**, e.g. `2a01:db8::7`, `[2a01:db8::7]:21118` | that address | where IPv6 reaches it; often works without a public IPv4 |
 | **Host name**, e.g. `myhost.example.com` or `myhost.example.com:21118` | every IPv6 and IPv4 address in DNS | as above |
+| **Invite code** `UT…` from the PC's **P2P tunnel** window | the PC's external address (STUN), LAN and IPv6, punched from both sides | between any two home networks, other countries included, with no public IP anywhere |
 | A plain **ID** not on the LAN | none (no servers); you are told to use the code or an address | — |
 
 **IPv6.** The PC listens on IPv6 for both TCP and QUIC and puts its global IPv6 address in the
 connection code. Routers usually block incoming IPv6, so the app asks the router (UPnP IGDv2
 `WANIPv6FirewallControl`) to open the port for this address; if the router cannot, the log says
 so, and the port has to be allowed in the router's IPv6 firewall by hand.
+
+### P2P tunnel (different networks, no public IP, no server)
+
+When neither device can be reached from the internet (home routers, provider NAT), Ultra RustDesk
+opens a direct encrypted tunnel between the two machines by punching through both routers at once.
+No server of ours or anyone else's carries any data: the only outside help is a public STUN server
+(Google, Cloudflare, Sipnet and others, asked at the same time), which only tells a device what
+its external address is. The addresses are swapped by hand, as two short codes:
+
+1. On the PC: the **P2P tunnel** button (globe-with-a-lock icon next to the connection code, or in the app bar
+   on a phone). The invite code `UT…` is made and **copied to the clipboard by itself**; send it
+   to whoever connects (any messenger).
+2. The controller enters the invite code instead of an ID. The answer code `UA…` appears and is
+   **copied by itself**; they send it back and press **Connect** (it waits up to 3 minutes).
+3. On the PC it is enough to **copy** the answer code: the open tunnel window picks it up from the
+   clipboard and accepts it by itself (pasting it and pressing **Accept** works too).
+
+Both sides then send packets to each other, the routers let them through as replies, and QUIC
+connects in a few seconds; inside the tunnel the usual pinned-key handshake and password login
+run. It works through most home routers. It does not work when **both** networks change the port
+for every destination (symmetric NAT, common on mobile internet): the log then says so (`HINT`),
+and switching one side to Wi-Fi or IPv6 helps. The STUN list can be replaced with the
+`ultra-stun-servers` option (comma-separated `host:port`).
 
 **VPN, Xray and similar.** Ultra RustDesk has no built-in proxy protocols. If a VPN or Xray client
 runs on the device in system / TUN mode, Ultra RustDesk simply uses that network like any other
@@ -196,6 +220,7 @@ Ultra RustDesk needs **Rust 1.85 or newer** (QUIC library).
 | Serverless by default: public servers never contacted | ✅ done |
 | IPv6 direct (TCP + QUIC), all DNS addresses raced, router IPv6 pinhole | ✅ done |
 | Live connection log | ✅ done |
+| P2P tunnel through both NATs (STUN + hole punching, invite / answer codes) | ✅ done |
 | Obfuscated QUIC inspired by Hysteria2 | not started |
 | TLS 1.3 over TCP 443 | not started |
 | WebSocket through a CDN | not started |

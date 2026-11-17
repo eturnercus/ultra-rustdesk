@@ -1110,6 +1110,22 @@ class RustdeskImpl {
     return '';
   }
 
+  Future<void> mainUltraTunnelInvite({dynamic hint}) {
+    return Future.value();
+  }
+
+  Future<String> mainUltraTunnelState({dynamic hint}) {
+    return Future.value('');
+  }
+
+  Future<void> mainUltraTunnelAccept({required String answer, dynamic hint}) {
+    return Future.value();
+  }
+
+  Future<String> mainUltraTunnelAnswer({required String code, dynamic hint}) {
+    return Future.value('');
+  }
+
   Future<String> mainUltraDiagLog({dynamic hint}) {
     return Future.value('');
   }

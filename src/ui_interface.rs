@@ -1375,6 +1375,44 @@ pub fn get_ultra_connection_code() -> String {
         .unwrap_or_default();
 }
 
+/// Ultra RustDesk: P2P tunnel, PC side. The tunnel lives in the service, which accepts it.
+pub fn ultra_tunnel_invite() {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        #[cfg(target_os = "android")]
+        crate::ultra_tunnel::host_invite();
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let _ = ipc::set_config("ultra_tunnel_invite", "".to_owned());
+    }
+}
+
+pub fn ultra_tunnel_accept(answer: String) {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        #[cfg(target_os = "android")]
+        crate::ultra_tunnel::host_accept(&answer);
+        let _ = answer;
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let _ = ipc::set_config("ultra_tunnel_accept", answer);
+    }
+}
+
+pub fn ultra_tunnel_state() -> String {
+    #[cfg(target_os = "android")]
+    return crate::ultra_tunnel::host_state();
+    #[cfg(target_os = "ios")]
+    return String::new();
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    return ipc::get_config("ultra_tunnel_state")
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| "error:the service is not running".to_owned());
+}
+
 pub fn get_fingerprint() -> String {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {

@@ -467,6 +467,16 @@ impl Client {
                 false,
             ));
         }
+        // Ultra RustDesk: an invite code ("UT...") opens a P2P tunnel through both NATs.
+        #[cfg(not(target_os = "ios"))]
+        if crate::ultra_tunnel::is_invite(peer) {
+            let (conn, pk, transport) = crate::ultra_tunnel::connect(peer).await?;
+            return Ok((
+                (conn, true, Some(pk), None, transport),
+                (0, "".to_owned()),
+                false,
+            ));
+        }
         if let Some(res) = crate::ultra_pin::try_lan_direct(peer).await {
             let (conn, pk, transport) = res?;
             return Ok((

@@ -988,6 +988,8 @@ async fn handle(data: Data, stream: &mut Connection) {
                     value = Some(crate::ultra_pin::my_connection_code());
                 } else if name == "ultra_diag" {
                     value = Some(crate::ultra_diag::dump());
+                } else if name == "ultra_tunnel_state" {
+                    value = Some(crate::ultra_tunnel::host_state());
                 } else if name == "fingerprint" {
                     // Ultra RustDesk: always shown, so it can be compared with the key a direct
                     // controller pinned (no rendezvous server confirms it).
@@ -1027,6 +1029,12 @@ async fn handle(data: Data, stream: &mut Connection) {
                     }
                 } else if name == "ultra_diag_clear" {
                     crate::ultra_diag::clear();
+                    updated = false;
+                } else if name == "ultra_tunnel_invite" {
+                    crate::ultra_tunnel::host_invite();
+                    updated = false;
+                } else if name == "ultra_tunnel_accept" {
+                    crate::ultra_tunnel::host_accept(&value);
                     updated = false;
                 } else if name == "temporary-password" {
                     password::update_temporary_password();

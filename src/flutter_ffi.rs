@@ -1885,6 +1885,42 @@ pub fn main_ultra_code_scope(code: String) -> SyncReturn<String> {
     SyncReturn(crate::ultra_pin::connection_code_scope(&code).to_owned())
 }
 
+/// Ultra RustDesk: P2P tunnel, PC side: makes an invite code (poll the state).
+pub fn main_ultra_tunnel_invite() {
+    crate::ui_interface::ultra_tunnel_invite()
+}
+
+/// Ultra RustDesk: P2P tunnel, PC side: "", "preparing", "invite:CODE", "badanswer:CODE",
+/// "waiting:CODE", "connected:ADDR", "closed" or "error:TEXT".
+pub fn main_ultra_tunnel_state() -> String {
+    crate::ui_interface::ultra_tunnel_state()
+}
+
+/// Ultra RustDesk: P2P tunnel, PC side: the controller's answer code.
+pub fn main_ultra_tunnel_accept(answer: String) {
+    crate::ui_interface::ultra_tunnel_accept(answer)
+}
+
+/// Ultra RustDesk: P2P tunnel, controller side: "answer:CODE" for an invite code,
+/// "error:TEXT", or "" when `code` is not an invite.
+pub fn main_ultra_tunnel_answer(code: String) -> String {
+    #[cfg(not(target_os = "ios"))]
+    {
+        if !crate::ultra_tunnel::is_invite(&code) {
+            return String::new();
+        }
+        match crate::ultra_tunnel::answer_for(&code) {
+            Ok(a) => format!("answer:{}", a),
+            Err(e) => format!("error:{}", e),
+        }
+    }
+    #[cfg(target_os = "ios")]
+    {
+        let _ = code;
+        String::new()
+    }
+}
+
 /// Ultra RustDesk: the live connection journal (listening side and outgoing attempts).
 pub fn main_ultra_diag_log() -> String {
     crate::ultra_diag::full_journal()

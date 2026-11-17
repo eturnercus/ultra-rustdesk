@@ -64,6 +64,7 @@ systemctl daemon-reload
 systemctl enable ultrarustdesk
 systemctl start ultrarustdesk
 update-desktop-database
+gtk-update-icon-cache -f -t -q /usr/share/icons/hicolor >/dev/null 2>&1 || true
 
 %preun
 case "$1" in

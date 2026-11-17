@@ -158,7 +158,7 @@ pub fn forget(peer: &str) -> bool {
     removed
 }
 
-fn hex_of(b: &[u8]) -> String {
+pub(crate) fn hex_of(b: &[u8]) -> String {
     b.iter().map(|u| format!("{:02x}", u)).collect()
 }
 
@@ -395,12 +395,12 @@ pub async fn try_lan_direct(id: &str) -> Option<ResultType<(Stream, Vec<u8>, &'s
 // lets the controller verify the device on the first connection without a pairing dialog.
 
 const CODE_PREFIX: &str = "UR";
-const CODE_KEY_HASH_LEN: usize = 6;
+pub(crate) const CODE_KEY_HASH_LEN: usize = 6;
 const B32: &[u8; 32] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 /// Where the UPnP thread leaves the router's external address for the code.
 pub const OPTION_EXTERNAL_IP: &str = "ultra-external-ip";
 
-fn key_hash(pk: &[u8]) -> [u8; CODE_KEY_HASH_LEN] {
+pub(crate) fn key_hash(pk: &[u8]) -> [u8; CODE_KEY_HASH_LEN] {
     use hbb_common::sha2::{Digest, Sha256};
     let h = Sha256::digest(pk);
     let mut out = [0u8; CODE_KEY_HASH_LEN];
@@ -408,7 +408,7 @@ fn key_hash(pk: &[u8]) -> [u8; CODE_KEY_HASH_LEN] {
     out
 }
 
-fn b32_encode(data: &[u8]) -> String {
+pub(crate) fn b32_encode(data: &[u8]) -> String {
     let mut out = String::new();
     let (mut buf, mut bits) = (0u32, 0u32);
     for &b in data {
@@ -425,7 +425,7 @@ fn b32_encode(data: &[u8]) -> String {
     out
 }
 
-fn b32_decode(s: &str) -> Option<Vec<u8>> {
+pub(crate) fn b32_decode(s: &str) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     let (mut buf, mut bits) = (0u32, 0u32);
     for c in s.bytes() {
@@ -442,7 +442,7 @@ fn b32_decode(s: &str) -> Option<Vec<u8>> {
 
 const CODE_MULTI: u8 = 2;
 
-fn push_ip(data: &mut Vec<u8>, ip: &std::net::IpAddr) {
+pub(crate) fn push_ip(data: &mut Vec<u8>, ip: &std::net::IpAddr) {
     match ip {
         std::net::IpAddr::V4(ip) => {
             data.push(4);
@@ -473,7 +473,7 @@ pub fn encode_connection_code(ips: &[std::net::IpAddr], port: u16, pk: &[u8]) ->
     format!("{}{}", CODE_PREFIX, b32_encode(&data))
 }
 
-fn take_ip(data: &[u8]) -> Option<(std::net::IpAddr, usize)> {
+pub(crate) fn take_ip(data: &[u8]) -> Option<(std::net::IpAddr, usize)> {
     match data.first()? {
         4 if data.len() >= 5 => Some((<[u8; 4]>::try_from(&data[1..5]).ok()?.into(), 5)),
         6 if data.len() >= 17 => Some((<[u8; 16]>::try_from(&data[1..17]).ok()?.into(), 17)),
@@ -540,7 +540,7 @@ pub fn is_public_ip(ip: &std::net::IpAddr) -> bool {
 
 /// The local address the OS would use towards `probe`; no packet is sent.
 #[cfg(not(target_os = "ios"))]
-fn outgoing_ip(bind: &str, probe: &str) -> Option<std::net::IpAddr> {
+pub(crate) fn outgoing_ip(bind: &str, probe: &str) -> Option<std::net::IpAddr> {
     let s = std::net::UdpSocket::bind(bind).ok()?;
     s.connect(probe).ok()?;
     Some(s.local_addr().ok()?.ip())

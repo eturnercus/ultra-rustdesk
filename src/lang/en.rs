@@ -311,6 +311,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("ultra-tunnel-answer-copied", "Answer code copied: send it to the PC owner"),
         ("ultra-tunnel-auto-tip", "Just copy the answer code you receive: it is pasted and accepted by itself"),
         ("ultra-tunnel-other-network", "From another network: P2P tunnel"),
+        ("ultra-code-off-tip", "No connection code: direct IP access is off (Settings → Security)."),
         ("ultra-diag-tip", "Every connection step, live. TRY: an attempt starts at an address; QUIC/TCP: how each transport ended and how long it took; DNS: addresses of a name; CODE: addresses in a code; LAN: local network; LISTEN: ports open on this device; UPNP: the router; IN: incoming connections; LOGIN: password login; ADDR: this device's addresses. \"timed out\" means packets do not get through (port closed, NAT or firewall), \"refused\" means nothing listens there, \"SECURITY\" means the key did not match."),
     ].iter().cloned().collect();
 }

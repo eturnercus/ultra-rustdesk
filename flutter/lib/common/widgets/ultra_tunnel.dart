@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../common.dart';
 import '../../models/platform_model.dart';
@@ -278,4 +279,106 @@ class _TunnelHostViewState extends State<_TunnelHostView> {
         },
         child: Text(translate('ultra-tunnel-new-invite')),
       );
+}
+
+/// The connection code with everything around it (copy, QR, P2P tunnel, log), for settings.
+class UltraCodePanel extends StatefulWidget {
+  const UltraCodePanel({super.key});
+
+  @override
+  State<UltraCodePanel> createState() => _UltraCodePanelState();
+}
+
+class _UltraCodePanelState extends State<UltraCodePanel> {
+  String _code = '';
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    // The code follows the device's addresses, which can change (Wi-Fi, VPN, router).
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _load());
+  }
+
+  Future<void> _load() async {
+    final c = await bind.mainUltraConnectionCode();
+    if (mounted && c != _code) setState(() => _code = c);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _showQr() {
+    gFFI.dialogManager.show((setState, close, context) => CustomAlertDialog(
+          title: Text(translate('Connection code')),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox(
+              width: 240,
+              height: 240,
+              child: QrImageView(
+                backgroundColor: Colors.white,
+                data: _code,
+                version: QrVersions.auto,
+                size: 240,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SelectableText(_code, style: const TextStyle(fontSize: 12)),
+          ]),
+          actions: [dialogButton('OK', onPressed: close)],
+          onSubmit: close,
+          onCancel: close,
+        ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lan = _code.isNotEmpty &&
+        bind.mainUltraCodeScope(code: _code) == 'lan';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_code.isEmpty)
+          Text(translate('ultra-code-off-tip'),
+              style: const TextStyle(color: Colors.orange))
+        else ...[
+          _codeBox(context, _code),
+          const SizedBox(height: 4),
+          Text(
+            translate(lan ? 'ultra-code-lan-tip' : 'ultra-code-internet-tip'),
+            style: TextStyle(
+                fontSize: 12, color: lan ? Colors.orange : Colors.grey),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 6, children: [
+          if (_code.isNotEmpty)
+            OutlinedButton.icon(
+              icon: const Icon(Icons.qr_code, size: 16),
+              label: Text(translate('QR code')),
+              onPressed: _showQr,
+            ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.vpn_lock, size: 16),
+            label: Text(translate('P2P tunnel')),
+            onPressed: () => showUltraTunnelHost(gFFI.dialogManager),
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.terminal, size: 16),
+            label: Text(translate('Connection log')),
+            onPressed: () => showUltraDiag(gFFI.dialogManager),
+          ),
+        ]),
+        if (lan) ...[
+          const SizedBox(height: 6),
+          Text(translate('ultra-tunnel-other-network'),
+              style: TextStyle(fontSize: 12, color: MyTheme.accent)),
+        ],
+      ],
+    );
+  }
 }

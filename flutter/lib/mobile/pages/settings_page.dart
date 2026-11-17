@@ -13,6 +13,8 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../common.dart';
 import '../../common/widgets/dialog.dart';
+import '../../common/widgets/ultra_diag.dart';
+import '../../common/widgets/ultra_tunnel.dart';
 import '../../common/widgets/login.dart';
 import '../../consts.dart';
 import '../../models/model.dart';
@@ -743,6 +745,29 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
     final settings = SettingsList(
       sections: [
         customClientSection,
+        // Ultra RustDesk: everything about direct connections in one place.
+        SettingsSection(
+          title: Text(translate('Direct connection')),
+          tiles: [
+            if (_connectionCode.isNotEmpty)
+              SettingsTile(
+                  onPressed: (context) => onCopyFingerprint(_connectionCode),
+                  title: Text(translate('Connection code')),
+                  value: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(_connectionCode),
+                  ),
+                  leading: Icon(Icons.link)),
+            SettingsTile(
+                onPressed: (context) => showUltraTunnelHost(gFFI.dialogManager),
+                title: Text(translate('P2P tunnel')),
+                leading: Icon(Icons.vpn_lock)),
+            SettingsTile(
+                onPressed: (context) => showUltraDiag(gFFI.dialogManager),
+                title: Text(translate('Connection log')),
+                leading: Icon(Icons.terminal)),
+          ],
+        ),
         if (!bind.isDisableAccount())
           SettingsSection(
             title: Text(translate('Account')),

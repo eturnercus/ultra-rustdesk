@@ -26,6 +26,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../common/widgets/dialog.dart';
+import '../../common/widgets/ultra_diag.dart';
+import '../../common/widgets/ultra_tunnel.dart';
 import '../../common/widgets/login.dart';
 
 const double _kTabWidth = 200;
@@ -1816,6 +1818,15 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
   Widget build(BuildContext context) {
     super.build(context);
     return ListView(controller: scrollController, children: [
+      // Ultra RustDesk: everything about direct connections in one place.
+      if (!isWeb)
+        _Card(title: 'Direct connection', children: [
+          const UltraCodePanel().marginOnly(left: _kContentHMargin),
+        ]),
+      if (!isWeb)
+        _Card(title: 'Connection log', children: [
+          const UltraDiagPanel(height: 300).marginOnly(left: _kContentHMargin),
+        ]),
       _lock(locked, 'Unlock Network Settings', () {
         locked = false;
         setState(() => {});

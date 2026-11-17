@@ -28,8 +28,43 @@ void showUltraDiag(OverlayDialogManager dialogManager) {
       ));
 }
 
+/// The live journal inside a page (settings), with its own Copy / Clear buttons.
+class UltraDiagPanel extends StatelessWidget {
+  final double height;
+  const UltraDiagPanel({super.key, this.height = 320});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _UltraDiagView(height: height),
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.copy, size: 16),
+            label: Text(translate('Copy to clipboard')),
+            onPressed: () async {
+              final text = await bind.mainUltraDiagLog();
+              Clipboard.setData(ClipboardData(text: text));
+              showToast(translate('Copied'));
+            },
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: Text(translate('Clear')),
+            onPressed: () => bind.mainUltraDiagClear(),
+          ),
+        ]),
+      ],
+    );
+  }
+}
+
 class _UltraDiagView extends StatefulWidget {
-  const _UltraDiagView();
+  /// Set inside a page; null in the dialog, which sizes itself to the screen.
+  final double? height;
+  const _UltraDiagView({this.height});
 
   @override
   State<_UltraDiagView> createState() => _UltraDiagViewState();
@@ -74,8 +109,10 @@ class _UltraDiagViewState extends State<_UltraDiagView> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return SizedBox(
-      width: size.width < 720 ? size.width * 0.9 : 680,
-      height: size.height * 0.6,
+      width: widget.height != null
+          ? double.infinity
+          : (size.width < 720 ? size.width * 0.9 : 680),
+      height: widget.height ?? size.height * 0.6,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

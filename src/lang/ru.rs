@@ -853,5 +853,8 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("ultra-tunnel-answer-copied", "Ответный код скопирован — отправьте его владельцу ПК"),
         ("ultra-tunnel-auto-tip", "Просто скопируйте полученный ответный код — он вставится и примется сам"),
         ("ultra-tunnel-other-network", "Подключение из другой сети — P2P-туннель"),
+        ("Direct connection", "Прямое подключение"),
+        ("QR code", "QR-код"),
+        ("ultra-code-off-tip", "Код подключения не показывается: прямой IP-доступ выключен (Настройки → Безопасность)."),
     ].iter().cloned().collect();
 }

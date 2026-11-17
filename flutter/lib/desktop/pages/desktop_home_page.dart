@@ -274,16 +274,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         if (code.isEmpty) return const SizedBox.shrink();
         return Container(
           margin: const EdgeInsets.only(left: 20, right: 16, top: 6),
+          padding: const EdgeInsets.only(left: 7),
+          decoration: const BoxDecoration(
+            border: Border(left: BorderSide(color: MyTheme.accent, width: 2)),
+          ),
           child: Row(
             children: [
-              Container(
-                width: 2,
-                height: 40,
-                decoration: const BoxDecoration(color: MyTheme.accent),
-              ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 7),
+                  padding: EdgeInsets.zero,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -297,7 +296,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                 ?.color
                                 ?.withOpacity(0.5)),
                       ),
-                      SelectableText(code, style: const TextStyle(fontSize: 13)),
+                      SelectableText(code,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.bold)),
                       Text(
                         translate(bind.mainUltraCodeScope(code: code) == 'lan'
                             ? 'ultra-code-lan-tip'
@@ -312,37 +315,53 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                     ?.color
                                     ?.withOpacity(0.5)),
                       ),
+                      // Below the code, not beside it: the panel is narrow, and a
+                      // row of buttons there left the code one letter wide.
+                      Wrap(
+                        spacing: 2,
+                        children: [
+                          _ultraCodeButton(Icons.copy, "Copy to clipboard", () {
+                            Clipboard.setData(ClipboardData(text: code));
+                            showToast(translate("Copied"));
+                          }),
+                          _ultraCodeButton(Icons.qr_code, "Connection code",
+                              () => _showUltraCodeQr(code)),
+                          _ultraCodeButton(Icons.terminal, "Connection log",
+                              () => showUltraDiag(gFFI.dialogManager)),
+                          _ultraCodeButton(Icons.vpn_lock, "P2P tunnel",
+                              () => showUltraTunnelHost(gFFI.dialogManager)),
+                        ],
+                      ),
+                      if (bind.mainUltraCodeScope(code: code) == 'lan')
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              foregroundColor: MyTheme.accent),
+                          icon: const Icon(Icons.vpn_lock, size: 16),
+                          label: Text(translate('ultra-tunnel-other-network'),
+                              style: const TextStyle(fontSize: 12)),
+                          onPressed: () =>
+                              showUltraTunnelHost(gFFI.dialogManager),
+                        ),
                     ],
                   ),
                 ),
-              ),
-              IconButton(
-                tooltip: translate("P2P tunnel"),
-                icon: const Icon(Icons.vpn_lock, size: 18),
-                onPressed: () => showUltraTunnelHost(gFFI.dialogManager),
-              ),
-              IconButton(
-                tooltip: translate("Connection log"),
-                icon: const Icon(Icons.terminal, size: 18),
-                onPressed: () => showUltraDiag(gFFI.dialogManager),
-              ),
-              IconButton(
-                tooltip: translate("Connection code"),
-                icon: const Icon(Icons.qr_code, size: 18),
-                onPressed: () => _showUltraCodeQr(code),
-              ),
-              IconButton(
-                tooltip: translate("Copy to clipboard"),
-                icon: const Icon(Icons.copy, size: 18),
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: code));
-                  showToast(translate("Copied"));
-                },
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _ultraCodeButton(IconData icon, String tip, VoidCallback onPressed) {
+    return IconButton(
+      tooltip: translate(tip),
+      icon: Icon(icon, size: 18),
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.all(4),
+      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+      onPressed: onPressed,
     );
   }
 

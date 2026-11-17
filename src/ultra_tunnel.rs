@@ -663,7 +663,7 @@ mod tests {
             "[2a01:db8::7]:40001".parse().unwrap(),
         ];
         let nonce = [1, 2, 3, 4];
-        let invite = encode(INVITE_PREFIX, &nonce, &addrs, Some(b"key"));
+        let invite = encode(INVITE_PREFIX, &nonce, &addrs, Some(b"key".as_slice()));
         let c = decode(INVITE_PREFIX, &invite).unwrap();
         assert_eq!(c.addrs, addrs);
         assert_eq!(c.nonce, nonce);
@@ -698,7 +698,9 @@ mod tests {
         let listener = hbb_common::quic::Listener::on_sockets(vec![server_sock]).unwrap();
         let client = hbb_common::quic::client_endpoint_on(UdpSocket::bind("127.0.0.1:0").unwrap()).unwrap();
         let server = tokio::spawn(async move { listener.accept().await.map(|x| x.1) });
-        hbb_common::quic::connect_from(&client, addr, 5_000).await.unwrap();
-        assert!(server.await.unwrap().is_some());
+        // Kept open until the server has it: a dropped connection never reaches accept().
+        let _stream = hbb_common::quic::connect_from(&client, addr, 5_000).await.unwrap();
+        let accepted = hbb_common::timeout(5_000, server).await;
+        assert!(matches!(accepted, Ok(Ok(Some(_)))));
     }
 }

@@ -852,5 +852,6 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("ultra-tunnel-invite-copied", ""),
         ("ultra-tunnel-answer-copied", ""),
         ("ultra-tunnel-auto-tip", ""),
+        ("ultra-tunnel-other-network", ""),
     ].iter().cloned().collect();
 }

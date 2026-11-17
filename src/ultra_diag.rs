@@ -51,6 +51,10 @@ pub fn full_journal() -> String {
             .ok()
             .flatten()
             .unwrap_or_default();
+        // Not installed: the service runs inside this very process, so it is one journal.
+        if !service.is_empty() && service == dump() {
+            return format!("=== This device (listening and outgoing) ===\n{}", service);
+        }
         out.push_str("=== This device (service: listening, UPnP, incoming) ===\n");
         if service.is_empty() {
             out.push_str("(the service is not running or has nothing to report yet)\n");

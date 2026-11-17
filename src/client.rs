@@ -5271,12 +5271,22 @@ pub fn check_if_retry(msgtype: &str, title: &str, text: &str, retry_for_relay: b
                 && !text.to_lowercase().contains("manually")
                 && !text.to_lowercase().contains("restricted")
                 && !text.to_lowercase().contains("incoming only")
-                && !text.to_lowercase().contains("not allowed")))
+                && !text.to_lowercase().contains("not allowed")
+                // Ultra RustDesk: "unreachable", "no server", "tunnel did not open": a retry
+                // a second later cannot change the answer, it only floods the log.
+                && !text.starts_with("ultra-")))
 }
 
 #[cfg(test)]
 mod retry_tests {
     use super::check_if_retry;
+
+    #[test]
+    fn ultra_direct_errors_are_not_retried() {
+        for text in ["ultra-unreachable-tip", "ultra-no-server-tip", "ultra-tunnel-failed-tip"] {
+            assert!(!check_if_retry("error", "Connection Error", text, false));
+        }
+    }
 
     #[test]
     fn incoming_only_error_is_not_retryable() {
